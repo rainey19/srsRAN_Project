@@ -99,7 +99,9 @@ public:
 // TODO
   bool get_mboard_sensor_names(std::vector<std::string>& sensors)
   {
-    dev->lldev
+    XTRX_API int xtrx_gtime_op(struct xtrx_dev* dev, int devno,
+                           xtrx_gtime_cmd_t cmd, gtime_data_t in,
+                           gtime_data_t *out);
 
     return safe_execution([this, &sensors]() { sensors = usrp->get_mboard_sensor_names(); });
   }

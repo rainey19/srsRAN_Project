@@ -30,20 +30,6 @@ using namespace srsran;
 // TODO
 bool radio_session_xtrx_impl::set_time_to_gps_time()
 {
-  const std::string sensor_name = "gps_time";
-
-  std::vector<std::string> sensors;
-  if (device.get_mboard_sensor_names(sensors) != UHD_ERROR_NONE) {
-    fmt::print("Error: failed to read sensors. {}\n", device.get_error_message());
-    return false;
-  }
-
-  // Find sensor name. Error if it is not available.
-  if (std::find(sensors.begin(), sensors.end(), sensor_name) == sensors.end()) {
-    fmt::print("Error: sensor {} not found.\n", sensor_name);
-    return false;
-  }
-
   // Get actual sensor value
   double frac_secs = 0.0;
   if (!device.get_sensor(sensor_name, frac_secs)) {
