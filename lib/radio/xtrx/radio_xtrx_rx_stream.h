@@ -25,6 +25,7 @@
 #include "radio_xtrx_exception_handler.h"
 #include "radio_xtrx_api.h"
 #include "srsran/gateways/baseband/baseband_gateway_buffer.h"
+#include "srsran/gateways/baseband/baseband_gateway.h"
 #include "srsran/radio/radio_configuration.h"
 #include "srsran/radio/radio_notification_handler.h"
 #include <mutex>
@@ -47,7 +48,7 @@ private:
   /// Radio notification interface.
   radio_notification_handler& notifier;
   /// Owns the XTRX Tx stream.
-  uhd::rx_streamer::sptr stream;
+  XTRXHandle* stream;
   /// Maximum number of samples in a single packet.
   unsigned max_packet_size;
   /// Indicates the number of channels.
@@ -64,7 +65,7 @@ private:
   bool receive_block(unsigned&                nof_rxd_samples,
                      baseband_gateway_buffer& buffs,
                      unsigned                 buffer_offset,
-                     uhd::rx_metadata_t&      metadata);
+                     xtrx_recv_ex_info&       metadata);
 
 public:
   /// Describes the necessary parameters to create an XTRX transmit stream.
@@ -80,23 +81,23 @@ public:
   };
 
   /// \brief Constructs a receive XTRX stream.
-  /// \param[in] usrp Provides the USRP context.
+  /// \param[in] xtrx_handle Provides the xtrx_handle context.
   /// \param[in] description Provides the stream configuration parameters.
   /// \param[in] notifier_ Provides the radio event notification handler.
-  radio_xtrx_rx_stream(uhd::usrp::multi_usrp::sptr& usrp,
+  radio_xtrx_rx_stream(std::shared_ptr<XTRXHandle>& xtrx_handle,
                       const stream_description&    description,
                       radio_notification_handler&  notifier_);
 
   /// \brief Starts the stream reception.
   /// \param[in] time_spec Indicates the start time of the stream.
   /// \return True if no exception is caught. Otherwise false.
-  bool start(const uhd::time_spec_t& time_spec);
+  bool start(const baseband_gateway_timestamp& time_spec);
 
   /// \brief Receives a baseband transmission.
   /// \param[in,out] buffs Provides the baseband buffers to receive.
   /// \param[in] time_spec Indicates the baseband reception time.
   /// \return True if no exception is caught. Otherwise false.
-  bool receive(baseband_gateway_buffer& buffs, uhd::time_spec_t& time_spec);
+  bool receive(baseband_gateway_buffer& buffs, baseband_gateway_timestamp& time_spec);
 
   /// \brief Stops the reception stream.
   /// \return True if no exception is caught. Otherwise false.

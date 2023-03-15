@@ -30,8 +30,6 @@
 #else // __clang__
 #pragma GCC diagnostic ignored "-Wsuggest-override"
 #endif // __clang__
-#include <uhd/types/metadata.hpp>
-#include <uhd/types/time_spec.hpp>
 #pragma GCC diagnostic pop
 
 namespace srsran {
@@ -64,8 +62,6 @@ private:
   /// Protects the class concurrent access.
   mutable std::mutex mutex;
 
-  uhd::time_spec_t wait_eob_timeout = uhd::time_spec_t();
-
 public:
   /// \brief Notifies that the transmit stream has been initialized successfully.
   void init_successful()
@@ -77,13 +73,11 @@ public:
   /// \brief Notifies a late or an underflow event.
   /// \remark Transitions state end of burst if it is in a burst.
   /// \param[in] time_spec Indicates the time the underflow event occurred.
-  void async_event_late_underflow(const uhd::time_spec_t& time_spec)
+  void async_event_late_underflow()
   {
     std::unique_lock<std::mutex> lock(mutex);
     if (state == states::IN_BURST) {
-      state            = states::END_OF_BURST;
-      wait_eob_timeout = time_spec;
-      wait_eob_timeout += WAIT_EOB_ACK_TIMEOUT_S;
+      state = states::END_OF_BURST;
     }
   }
 
@@ -97,61 +91,9 @@ public:
     }
   }
 
-  /// \brief Notifies a new block transmission.
-  /// \param[out] metadata Provides the destination of the required metadata.
-  /// \param[in] time_spec Indicates the transmission time.
-  /// \return True if the block shall be transmitted. False if the block shall be ignored.
-  bool transmit_block(uhd::tx_metadata_t& metadata, uhd::time_spec_t& time_spec)
+  void stop()
   {
     std::unique_lock<std::mutex> lock(mutex);
-    switch (state) {
-      case states::START_BURST:
-        // Set start of burst flag and time spec.
-        metadata.has_time_spec  = true;
-        metadata.start_of_burst = true;
-        metadata.time_spec      = time_spec;
-        // Transition to in-burst.
-        state = states::IN_BURST;
-        break;
-      case states::IN_BURST:
-        // All good.
-        break;
-      case states::END_OF_BURST:
-        // Flag end-of-burst.
-        metadata.end_of_burst = true;
-        state                 = states::WAIT_END_OF_BURST;
-        if (wait_eob_timeout == uhd::time_spec_t()) {
-          wait_eob_timeout = metadata.time_spec;
-          wait_eob_timeout += WAIT_EOB_ACK_TIMEOUT_S;
-        }
-        break;
-      case states::WAIT_END_OF_BURST:
-        // Consider starting the burst if the wait for end-of-burst expired.
-        if (wait_eob_timeout.get_real_secs() < time_spec.get_real_secs()) {
-          // Set start of burst flag and time spec.
-          metadata.has_time_spec  = true;
-          metadata.start_of_burst = true;
-          metadata.time_spec      = time_spec;
-          // Transition to in-burst.
-          state = states::IN_BURST;
-          break;
-        }
-      case states::UNINITIALIZED:
-      case states::STOP:
-        // Ignore transmission.
-        return false;
-    }
-
-    // Transmission shall not be ignored.
-    return true;
-  }
-
-  void stop(uhd::tx_metadata_t& metadata)
-  {
-    std::unique_lock<std::mutex> lock(mutex);
-    if (state == states::IN_BURST) {
-      metadata.end_of_burst = true;
-    }
     state = states::STOP;
   }
 

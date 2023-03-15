@@ -35,7 +35,7 @@ namespace srsran {
 /// supported by the XTRX device.
 ///
 /// It is up to the user to select parameters within ranges. These can be consulted using the XTRX application \e
-/// uhd_usrp_probe.
+/// uhd_xtrx_dev_probe.
 class radio_config_xtrx_config_validator : public radio_configuration::validator
 {
 public:

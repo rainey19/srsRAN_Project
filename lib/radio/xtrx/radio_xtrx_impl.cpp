@@ -23,8 +23,6 @@
 #include "radio_xtrx_impl.h"
 #include "radio_xtrx_device.h"
 
-#include <xtrx/utils/thread_priority.h>
-
 using namespace srsran;
 
 // TODO
@@ -38,7 +36,7 @@ bool radio_session_xtrx_impl::set_time_to_gps_time()
   }
 
   // Get time and set
-  fmt::print("Setting USRP time to {}s\n", frac_secs);
+  fmt::print("Setting xtrx_dev time to {}s\n", frac_secs);
   if (device.set_time_unknown_pps(uhd::time_spec_t(frac_secs)) != UHD_ERROR_NONE) {
     fmt::print("Error: failed to set time. {}\n", device.get_error_message());
     return false;
@@ -47,7 +45,6 @@ bool radio_session_xtrx_impl::set_time_to_gps_time()
   return true;
 }
 
-// TODO
 bool radio_session_xtrx_impl::wait_sensor_locked(bool&              is_locked,
                                                 const std::string& sensor_name,
                                                 bool               is_mboard,
@@ -164,7 +161,6 @@ bool radio_session_xtrx_impl::set_rx_freq(unsigned int port_idx, radio_configura
   return true;
 }
 
-// TODO
 bool radio_session_xtrx_impl::start_rx_stream()
 {
   // Prevent multiple threads from starting streams simultaneously.
@@ -178,15 +174,15 @@ bool radio_session_xtrx_impl::start_rx_stream()
   stream_start_required = false;
 
   // Immediate start of the stream.
-  uhd::time_spec_t time_spec = {};
+  baseband_gateway_timestamp time_spec;
 
-  // Get current USRP time as timestamp.
+  // Get current xtrx_dev time as timestamp.
   if (!device.get_time_now(time_spec)) {
     fmt::print("Error: getting time to start stream. {}.\n", device.get_error_message());
     return false;
   }
   // Add delay to current time.
-  time_spec += START_STREAM_DELAY_S;
+  time_spec += START_STREAM_DELAY_S * sampling_rate_hz;
 
   // Issue all streams to start.
   for (auto& stream : rx_streams) {
@@ -198,20 +194,11 @@ bool radio_session_xtrx_impl::start_rx_stream()
   return true;
 }
 
-// TODO
 radio_session_xtrx_impl::radio_session_xtrx_impl(const radio_configuration::radio& radio_config,
                                                task_executor&                    async_executor_,
                                                radio_notification_handler&       notifier_) :
   sampling_rate_hz(radio_config.sampling_rate_hz), async_executor(async_executor_), notifier(notifier_)
 {
-  // Disable fast-path (U/L/O) messages.
-  setenv("UHD_LOG_FASTPATH_DISABLE", "1", 0);
-
-  // Set real time priority to XTRX threads. All threads created from this thread inherit the priority.
-  if (xtrx_set_thread_priority(1.0, true) != UHD_ERROR_NONE) {
-    fmt::print(stderr, "Warning: Scheduling priority of XTRX not changed. Cause: Not enough privileges.\n");
-  }
-
   // Set the logging level.
 #ifdef XTRX_LOG_INFO
   int severity_level = 0;
@@ -248,17 +235,9 @@ radio_session_xtrx_impl::radio_session_xtrx_impl(const radio_configuration::radi
   }
 
   // Open device.
-  if (!device.usrp_make(radio_config.args)) {
+  if (!device.xtrx_dev_make(radio_config.args)) {
     fmt::print("Failed to open device with address '{}': {}\n", radio_config.args, device.get_error_message());
     return;
-  }
-
-  static const std::set<radio_xtrx_device_type::types> automatic_mcr_devices = {radio_xtrx_device_type::types::B200};
-  if (automatic_mcr_devices.count(device.get_type())) {
-    if (!device.set_automatic_master_clock_rate(radio_config.sampling_rate_hz)) {
-      fmt::print("Error setting master clock rate. {}\n", device.get_error_message());
-      return;
-    }
   }
 
   bool        is_locked = false;
@@ -269,10 +248,11 @@ radio_session_xtrx_impl::radio_session_xtrx_impl(const radio_configuration::radi
     return;
   }
 
+  // TODO
   // Set GPS time if GPSDO is selected.
-  if (radio_config.clock.sync == radio_configuration::clock_sources::source::GPSDO) {
-    set_time_to_gps_time();
-  }
+  // if (radio_config.clock.sync == radio_configuration::clock_sources::source::GPSDO) {
+  //   set_time_to_gps_time();
+  // }
 
   // Select oscillator sensor name.
   if (radio_config.clock.sync == radio_configuration::clock_sources::source::GPSDO) {
@@ -302,11 +282,12 @@ radio_session_xtrx_impl::radio_session_xtrx_impl(const radio_configuration::radi
     return;
   }
 
+  // TODO
   // Reset timestamps.
-  if ((total_rx_channel_count > 1 || total_tx_channel_count > 1) &&
-      radio_config.clock.sync != radio_configuration::clock_sources::source::GPSDO) {
-    device.set_time_unknown_pps(uhd::time_spec_t());
-  }
+  // if ((total_rx_channel_count > 1 || total_tx_channel_count > 1) &&
+  //     radio_config.clock.sync != radio_configuration::clock_sources::source::GPSDO) {
+  //   device.set_time_unknown_pps(uhd::time_spec_t());
+  // }
 
   // Lists of stream descriptions.
   std::vector<radio_xtrx_tx_stream::stream_description> tx_stream_description_list;
@@ -422,24 +403,17 @@ radio_session_xtrx_impl::radio_session_xtrx_impl(const radio_configuration::radi
   }
 
   // Create receive streams.
-  for (unsigned rx_stream_idx = 0; rx_stream_idx != radio_config.tx_streams.size(); ++rx_stream_idx) {
+  for (unsigned rx_stream_idx = 0; rx_stream_idx != radio_config.rx_streams.size(); ++rx_stream_idx) {
     if (rx_streams.emplace_back(device.create_rx_stream(notifier, rx_stream_description_list[rx_stream_idx])) ==
         nullptr) {
       return;
     }
   }
 
-  // Restore thread priorities.
-  if (uhd_set_thread_priority(0, false) != UHD_ERROR_NONE) {
-    fmt::print("Error: setting XTRX thread priority.\n");
-    return;
-  }
-
   // Transition to successfully initialized.
   state = states::SUCCESSFUL_INIT;
 }
 
-// TODO
 void radio_session_xtrx_impl::stop()
 {
   // Transition state to stop.
@@ -456,7 +430,6 @@ void radio_session_xtrx_impl::stop()
   }
 }
 
-// TODO
 void radio_session_xtrx_impl::transmit(unsigned int                                  stream_id,
                                       const baseband_gateway_transmitter::metadata& metadata,
                                       baseband_gateway_buffer&                      data)
@@ -464,13 +437,15 @@ void radio_session_xtrx_impl::transmit(unsigned int                             
   report_fatal_error_if_not(stream_id < tx_streams.size(),
                             "Stream identifier ({}) exceeds the number of transmit streams  ({}).",
                             stream_id,
-                            (int)rx_streams.size());
+                            (int)tx_streams.size());
 
-  uhd::time_spec_t time_spec = time_spec.from_ticks(metadata.ts, sampling_rate_hz);
-  tx_streams[stream_id]->transmit(data, time_spec);
+  // metadata timestamp is multiples of sample time
+  // ts(s) = 1/Fs * ts
+  // ts = 1/sampling_rate_hz * metadata.ts
+  // I think XTRX is the same so no conversion needed?
+  tx_streams[stream_id]->transmit(data, metadata.ts);
 }
 
-// TODO
 // See interface for documentation.
 baseband_gateway_receiver::metadata radio_session_xtrx_impl::receive(baseband_gateway_buffer& data, unsigned stream_id)
 {
@@ -484,14 +459,12 @@ baseband_gateway_receiver::metadata radio_session_xtrx_impl::receive(baseband_ga
     return ret;
   }
 
-  uhd::time_spec_t time_spec = {};
+  baseband_gateway_timestamp time_spec;
   if (!rx_streams[stream_id]->receive(data, time_spec)) {
     return ret;
   }
 
-  ret.ts = static_cast<baseband_gateway_timestamp>(time_spec.get_full_secs()) *
-               static_cast<baseband_gateway_timestamp>(sampling_rate_hz) +
-           static_cast<baseband_gateway_timestamp>(sampling_rate_hz * time_spec.get_frac_secs());
+  ret.ts = time_spec;
 
   return ret;
 }

@@ -28,5 +28,5 @@
 #else // __clang__
 #pragma GCC diagnostic ignored "-Wsuggest-override"
 #endif // __clang__
-#include <xtrx_api.h>
+#include <radio_xtrx_handle.h>
 #pragma GCC diagnostic pop

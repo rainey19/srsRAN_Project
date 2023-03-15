@@ -26,6 +26,7 @@
 #include "radio_xtrx_api.h"
 #include "radio_xtrx_tx_stream_fsm.h"
 #include "srsran/gateways/baseband/baseband_gateway_buffer.h"
+#include "srsran/gateways/baseband/baseband_gateway.h"
 #include "srsran/radio/radio_configuration.h"
 #include "srsran/radio/radio_notification_handler.h"
 #include "srsran/support/executors/task_executor.h"
@@ -47,7 +48,7 @@ private:
   /// Radio notification interface.
   radio_notification_handler& notifier;
   /// Owns the xtrx Tx stream.
-  uhd::tx_streamer::sptr stream;
+  XTRXHandle* stream;
   /// Protects concurrent stream transmit.
   std::mutex stream_transmit_mutex;
   /// Sampling rate in Hz.
@@ -57,22 +58,16 @@ private:
   /// Indicates the current internal state.
   radio_xtrx_tx_stream_fsm state_fsm;
 
-  /// Receive asynchronous message.
-  void recv_async_msg();
-
-  /// Runs the asynchronous message reception through the asynchronous task executor.
-  void run_recv_async_msg();
-
   /// \brief Transmits a single baseband block.
   /// \param[out] nof_txd_samples Number of transmitted samples.
   /// \param[in] data Provides the buffers tpo transmit.
   /// \param[in] offset Indicates the sample offset in the transmit buffers.
   /// \param[in] time_spec Indicates the transmission timestamp.
   /// \return True if no exception is caught in the transmission process. Otherwise, false.
-  bool transmit_block(unsigned&                nof_txd_samples,
-                      baseband_gateway_buffer& data,
-                      unsigned                 offset,
-                      uhd::time_spec_t&        time_spec);
+  bool transmit_block(unsigned&                   nof_txd_samples,
+                      baseband_gateway_buffer&    data,
+                      unsigned                    offset,
+                      baseband_gateway_timestamp& time_spec);
 
 public:
   /// Describes the necessary parameters to create an xtrx transmit stream.
@@ -90,20 +85,20 @@ public:
   };
 
   /// \brief Constructs an xtrx transmit stream.
-  /// \param[in] usrp Provides the USRP context.
+  /// \param[in] xtrx_handle Provides the xtrx_handle context.
   /// \param[in] description Provides the stream configuration parameters.
   /// \param[in] async_executor_ Provides the asynchronous task executor.
   /// \param[in] notifier_ Provides the radio event notification handler.
-  radio_xtrx_tx_stream(uhd::usrp::multi_usrp::sptr& usrp,
-                      const stream_description&    description,
-                      task_executor&               async_executor_,
-                      radio_notification_handler&  notifier_);
+  radio_xtrx_tx_stream(std::shared_ptr<XTRXHandle>& xtrx_handle,
+                      const stream_description&     description,
+                      task_executor&                async_executor_,
+                      radio_notification_handler&   notifier_);
 
   /// \brief Transmits baseband signal.
   /// \param[in] data Provides the baseband buffers to transmit.
   /// \param[in] time_spec Indicates the transmission time.
   /// \return True if the transmission was successful. Otherwise, false.
-  bool transmit(baseband_gateway_buffer& data, uhd::time_spec_t time_spec);
+  bool transmit(baseband_gateway_buffer& data, baseband_gateway_timestamp time_spec);
 
   /// Stop the transmission.
   void stop();

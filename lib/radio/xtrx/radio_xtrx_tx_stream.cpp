@@ -24,81 +24,13 @@
 
 using namespace srsran;
 
-void radio_xtrx_tx_stream::recv_async_msg()
-{
-  xtrx_exception_handler exception_handler;
-  bool                  valid;
-  uhd::async_metadata_t async_metadata;
-
-  // Retrieve asynchronous message.
-  if (!exception_handler.safe_execution([this, &valid, &async_metadata]() {
-        valid = stream->recv_async_msg(async_metadata, RECV_ASYNC_MSG_TIMEOUT_S);
-      })) {
-    fmt::print(stderr,
-               "Error: receiving asynchronous message for stream {}. {}.\n",
-               stream_id,
-               exception_handler.get_error_message().c_str());
-    return;
-  }
-
-  // Skip if it is not valid.
-  if (!valid) {
-    return;
-  }
-
-  // Handle event.
-  radio_notification_handler::event_description event_description = {};
-  event_description.stream_id                                     = stream_id;
-  event_description.channel_id                                    = async_metadata.channel;
-  event_description.source                                        = radio_notification_handler::event_source::TRANSMIT;
-  event_description.type                                          = radio_notification_handler::event_type::UNDEFINED;
-  switch (async_metadata.event_code) {
-    case uhd::async_metadata_t::EVENT_CODE_BURST_ACK:
-      state_fsm.async_event_end_of_burst_ack();
-      break;
-    case uhd::async_metadata_t::EVENT_CODE_TIME_ERROR:
-      event_description.type = radio_notification_handler::event_type::LATE;
-      state_fsm.async_event_late_underflow(async_metadata.time_spec);
-      break;
-    case uhd::async_metadata_t::EVENT_CODE_UNDERFLOW:
-    case uhd::async_metadata_t::EVENT_CODE_UNDERFLOW_IN_PACKET:
-      event_description.type = radio_notification_handler::event_type::UNDERFLOW;
-      state_fsm.async_event_late_underflow(async_metadata.time_spec);
-      break;
-    case uhd::async_metadata_t::EVENT_CODE_SEQ_ERROR:
-    case uhd::async_metadata_t::EVENT_CODE_SEQ_ERROR_IN_BURST:
-    case uhd::async_metadata_t::EVENT_CODE_USER_PAYLOAD:
-      event_description.type = radio_notification_handler::event_type::OTHER;
-      break;
-  }
-
-  // Notify event if it is defined.
-  if (event_description.type != radio_notification_handler::event_type::UNDEFINED) {
-    notifier.on_radio_rt_event(event_description);
-  }
-}
-
-void radio_xtrx_tx_stream::run_recv_async_msg()
-{
-  // If stop was called, then stop enqueueing the task.
-  if (state_fsm.is_stopped()) {
-    return;
-  }
-
-  // Receive asynchronous message.
-  recv_async_msg();
-
-  // Enqueue the task again.
-  async_executor.defer([this]() { run_recv_async_msg(); });
-}
-
-bool radio_xtrx_tx_stream::transmit_block(unsigned&                nof_txd_samples,
-                                         baseband_gateway_buffer& buffs,
-                                         unsigned                 buffer_offset,
-                                         uhd::time_spec_t&        time_spec)
+bool radio_xtrx_tx_stream::transmit_block(unsigned&                  nof_txd_samples,
+                                         baseband_gateway_buffer&    buffs,
+                                         unsigned                    buffer_offset,
+                                         baseband_gateway_timestamp& time_spec)
 {
   // Prepare metadata.
-  uhd::tx_metadata_t metadata = {};
+  xtrx_send_ex_info_t metadata = {0};
 
   // Extract number of samples.
   unsigned num_samples = buffs[0].size() - buffer_offset;
@@ -106,53 +38,56 @@ bool radio_xtrx_tx_stream::transmit_block(unsigned&                nof_txd_sampl
   // Make sure the number of channels is equal.
   report_fatal_error_if_not(buffs.get_nof_channels() == nof_channels, "Number of channels does not match.");
 
-  // Run states
-  if (!state_fsm.transmit_block(metadata, time_spec)) {
-    nof_txd_samples = num_samples;
-    return true;
-  }
-
   // Flatten buffers.
   static_vector<void*, RADIO_MAX_NOF_CHANNELS> buffs_flat_ptr(nof_channels);
   for (unsigned channel = 0; channel != nof_channels; ++channel) {
     buffs_flat_ptr[channel] = (void*)buffs[channel].subspan(buffer_offset, num_samples).data();
   }
 
-  // Make XTRX buffers.
-  uhd::tx_streamer::buffs_type buffs_cpp(buffs_flat_ptr.data(), nof_channels);
-
-  // Notify start of burst.
-  if (metadata.start_of_burst) {
-    radio_notification_handler::event_description event_description = {};
-    event_description.stream_id                                     = stream_id;
-    event_description.channel_id                                    = 0;
-    event_description.source = radio_notification_handler::event_source::TRANSMIT;
-    event_description.type   = radio_notification_handler::event_type::START_OF_BURST;
-    event_description.timestamp.emplace(time_spec.to_ticks(srate_hz));
-    notifier.on_radio_rt_event(event_description);
-  }
-
-  // Notify end of burst.
-  if (metadata.end_of_burst) {
-    radio_notification_handler::event_description event_description = {};
-    event_description.stream_id                                     = stream_id;
-    event_description.channel_id                                    = 0;
-    event_description.source = radio_notification_handler::event_source::TRANSMIT;
-    event_description.type   = radio_notification_handler::event_type::END_OF_BURST;
-    event_description.timestamp.emplace(time_spec.to_ticks(srate_hz));
-    notifier.on_radio_rt_event(event_description);
-  }
+  metadata.buffer_count = nof_channels;
+  metadata.buffers = buffs_flat_ptr.data();
+  metadata.flags = XTRX_TX_DONT_BUFFER;
+  metadata.samples = num_samples;
+  metadata.ts = time_spec;
 
   // Safe transmission.
-  return safe_execution([this, &buffs_cpp, num_samples, &metadata, &nof_txd_samples]() {
-    nof_txd_samples = stream->send(buffs_cpp, num_samples, metadata, TRANSMIT_TIMEOUT_S);
+  int res = safe_execution([this, &metadata, &nof_txd_samples]() {
+    int res_;
+    if (res_ = xtrx_send_sync_ex(stream->dev(), &metadata)) { fprintf(stderr, "trx_xtrx_write: xtrx_send_burst_sync err=%d\n", res_); }
+    nof_txd_samples = metadata.out_samples;
   });
+
+  // Notify if there were lates
+  if (metadata.out_txlatets)
+  {
+    radio_notification_handler::event_description event_description = {};
+    event_description.stream_id                                     = stream_id;
+    event_description.channel_id                                    = 0;
+    event_description.source = radio_notification_handler::event_source::TRANSMIT;
+    event_description.type   = radio_notification_handler::event_type::LATE;
+    event_description.timestamp.emplace(time_spec);
+    notifier.on_radio_rt_event(event_description);
+  }
+
+  // Notify if idk but it seems bad
+  if (metadata.out_flags == XTRX_TX_DISCARDED_TO)
+  {
+    radio_notification_handler::event_description event_description = {};
+    event_description.stream_id                                     = stream_id;
+    event_description.channel_id                                    = 0;
+    event_description.source = radio_notification_handler::event_source::TRANSMIT;
+    event_description.type   = radio_notification_handler::event_type::OTHER;
+    event_description.timestamp.emplace(time_spec);
+    notifier.on_radio_rt_event(event_description);
+  }
+
+  return res;
 }
 
-radio_xtrx_tx_stream::radio_xtrx_tx_stream(uhd::usrp::multi_usrp::sptr& usrp,
-                                         const stream_description&    description,
-                                         task_executor&               async_executor_,
-                                         radio_notification_handler&  notifier_) :
+radio_xtrx_tx_stream::radio_xtrx_tx_stream(std::shared_ptr<XTRXHandle>& xtrx_handle,
+                                         const stream_description&      description,
+                                         task_executor&                 async_executor_,
+                                         radio_notification_handler&    notifier_) :
   stream_id(description.id),
   async_executor(async_executor_),
   notifier(notifier_),
@@ -160,36 +95,61 @@ radio_xtrx_tx_stream::radio_xtrx_tx_stream(uhd::usrp::multi_usrp::sptr& usrp,
   nof_channels(description.ports.size())
 {
   // Build stream arguments.
-  uhd::stream_args_t stream_args = {};
-  stream_args.cpu_format         = "fc32";
+  stream = xtrx_handle.get();
+
+  stream->dev_params.tx.hfmt = XTRX_IQ_FLOAT32;
+  stream->dev_params.tx.flags = 0;
+	stream->dev_params.tx.paketsize = 1024;
+  stream->dev_params.tx_repeat_buf = NULL;
+  stream->dev_params.dir = XTRX_TX;
+	stream->dev_params.nflags = 0;
+
+  switch (nof_channels)
+  {
+    default:
+    case 1:
+      stream->dev_params.tx.flags |= XTRX_RSP_SISO_MODE;
+      stream->dev_params.tx.chs = XTRX_CH_A;
+      break;
+    case 2:
+      stream->dev_params.tx.chs = XTRX_CH_AB;
+      if (description.ports[0] == 1 && description.ports[1] == 0)
+        stream->dev_params.rx.flags |= XTRX_RSP_SWAP_AB;
+      break;
+  }
+
   switch (description.otw_format) {
     case radio_configuration::over_the_wire_format::DEFAULT:
     case radio_configuration::over_the_wire_format::SC16:
-      stream_args.otw_format = "sc16";
+      stream->dev_params.tx.wfmt = XTRX_WF_16;
       break;
     case radio_configuration::over_the_wire_format::SC12:
-      stream_args.otw_format = "sc12";
+      stream->dev_params.tx.wfmt = XTRX_WF_12;
       break;
     case radio_configuration::over_the_wire_format::SC8:
-      stream_args.otw_format = "sc8";
+      stream->dev_params.tx.wfmt = XTRX_WF_8;
       break;
-  }
-  stream_args.args     = description.args;
-  stream_args.channels = description.ports;
+  }	
 
-  if (!safe_execution([this, usrp, &stream_args]() { stream = usrp->get_tx_stream(stream_args); })) {
-    printf("Error:  failed to create transmit stream %d. %s.\n", stream_id, get_error_message().c_str());
-    return;
+  xtrx_stop(stream->dev(), XTRX_TX);
+
+	if (xtrx_set_antenna(stream->dev(), XTRX_TX_AUTO)) {
+		throw std::runtime_error("SoapyXTRX::setupStream() set antenna AUTO xtrx_set_antenna() err");
+	}
+
+  if (xtrx_tune_tx_bandwidth(stream->dev(), stream->dev_params.tx.chs, description.srate_hz, NULL)) {
+		throw std::runtime_error("SoapyXTRX::setupStream() xtrx_tune_tx_bandwidth err");
   }
+
+	// if (xtrx_run_ex(stream->dev(), &stream->dev_params)) {
+  //   throw std::runtime_error("SoapyXTRX::setupStream() xtrx_run_ex err");
+	// }
 
   // Notify FSM that it was successfully initialized.
   state_fsm.init_successful();
-
-  // Create asynchronous task.
-  run_recv_async_msg();
 }
 
-bool radio_xtrx_tx_stream::transmit(baseband_gateway_buffer& data, uhd::time_spec_t time_spec)
+bool radio_xtrx_tx_stream::transmit(baseband_gateway_buffer& data, baseband_gateway_timestamp time_spec)
 {
   // Protect stream transmitter.
   std::unique_lock<std::mutex> lock(stream_transmit_mutex);
@@ -218,35 +178,8 @@ bool radio_xtrx_tx_stream::transmit(baseband_gateway_buffer& data, uhd::time_spe
 
 void radio_xtrx_tx_stream::stop()
 {
-  uhd::tx_metadata_t metadata;
-  state_fsm.stop(metadata);
-
-  // Send end-of-burst if it is in the middle of a burst.
-  if (metadata.end_of_burst) {
-    std::unique_lock<std::mutex> transmit_lock(stream_transmit_mutex);
-
-    // Notify end of burst.
-    radio_notification_handler::event_description event_description = {};
-    event_description.stream_id                                     = stream_id;
-    event_description.channel_id                                    = 0;
-    event_description.source = radio_notification_handler::event_source::TRANSMIT;
-    event_description.type   = radio_notification_handler::event_type::END_OF_BURST;
-    notifier.on_radio_rt_event(event_description);
-
-    // Flatten buffers.
-    std::array<radio_sample_type, 4>             buffer;
-    static_vector<void*, RADIO_MAX_NOF_CHANNELS> buffs_flat_ptr(nof_channels);
-    for (unsigned channel = 0; channel != nof_channels; ++channel) {
-      buffs_flat_ptr[channel] = (void*)buffer.data();
-    }
-
-    // Make XTRX buffers.
-    uhd::tx_streamer::buffs_type buffs_cpp(buffs_flat_ptr.data(), nof_channels);
-
-    // Safe transmission. Ignore return.
-    safe_execution([this, &buffs_cpp, &metadata]() {
-      // Actual transmission. Ignore number of transmitted samples.
-      stream->send(buffs_cpp, 0, metadata, TRANSMIT_TIMEOUT_S);
-    });
+  state_fsm.stop();
+  if (xtrx_stop(stream->dev(), XTRX_TX)) {
+    printf("Something went wrong stopping TX stream");
   }
 }

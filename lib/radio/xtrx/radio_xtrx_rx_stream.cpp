@@ -24,10 +24,10 @@
 
 using namespace srsran;
 
-bool radio_xtrx_rx_stream::receive_block(unsigned&                nof_rxd_samples,
+bool radio_xtrx_rx_stream::receive_block(unsigned&               nof_rxd_samples,
                                         baseband_gateway_buffer& data,
                                         unsigned                 offset,
-                                        uhd::rx_metadata_t&      metadata)
+                                        xtrx_recv_ex_info&       metadata)
 {
   // Extract number of samples.
   unsigned num_samples = data.get_nof_samples() - offset;
@@ -50,60 +50,79 @@ bool radio_xtrx_rx_stream::receive_block(unsigned&                nof_rxd_sample
     buffs_flat_ptr[channel] = (void*)data[channel].subspan(offset, num_samples).data();
   }
 
-  uhd::rx_streamer::buffs_type buffs_cpp(buffs_flat_ptr.data(), nof_channels);
+  // Safe transmission.
+	metadata.samples = num_samples;
+	metadata.buffer_count = (unsigned)nof_channels;
+	metadata.buffers = buffs_flat_ptr.data();
+	metadata.flags = RCVEX_DONT_INSER_ZEROS; //RCVEX_EXTRA_LOG;
 
-  return safe_execution([this, buffs_cpp, num_samples, &metadata, &nof_rxd_samples]() {
-    nof_rxd_samples = stream->recv(buffs_cpp, num_samples, metadata, RECEIVE_TIMEOUT_S, ONE_PACKET);
-  });
+  int res = xtrx_recv_sync_ex(stream->dev(), &metadata);
+  if (res) {
+    fprintf(stderr, "trx_xtrx_read: xtrx_recv_sync count=%d err=%d\n", num_samples, res);
+  }
+  nof_rxd_samples = metadata.out_samples;
+
+	return res;
 }
 
-radio_xtrx_rx_stream::radio_xtrx_rx_stream(uhd::usrp::multi_usrp::sptr& usrp,
-                                         const stream_description&    description,
-                                         radio_notification_handler&  notifier_) :
+radio_xtrx_rx_stream::radio_xtrx_rx_stream(std::shared_ptr<XTRXHandle>& xtrx_handle,
+                                         const stream_description&      description,
+                                         radio_notification_handler&    notifier_) :
   id(description.id), notifier(notifier_)
 {
   // Build stream arguments.
-  uhd::stream_args_t stream_args = {};
-  stream_args.cpu_format         = "fc32";
+  stream = xtrx_handle.get();
+
+  stream->dev_params.rx.hfmt = XTRX_IQ_FLOAT32;
+  stream->dev_params.rx.flags = 0;
+	stream->dev_params.rx.paketsize = 1024;
+  stream->dev_params.dir = XTRX_RX;
+	stream->dev_params.nflags = 0;
+
+  switch (nof_channels) {
+    default:
+    case 1:
+      stream->dev_params.rx.flags |= XTRX_RSP_SISO_MODE;
+      stream->dev_params.rx.chs = XTRX_CH_A;
+      break;
+    case 2:
+      stream->dev_params.rx.chs = XTRX_CH_AB;
+      if (description.ports[0] == 1 && description.ports[1] == 0)
+        stream->dev_params.rx.flags |= XTRX_RSP_SWAP_AB;
+      break;
+  }
+
   switch (description.otw_format) {
     case radio_configuration::over_the_wire_format::DEFAULT:
     case radio_configuration::over_the_wire_format::SC16:
-      stream_args.otw_format = "sc16";
+      stream->dev_params.rx.wfmt = XTRX_WF_16;
       break;
     case radio_configuration::over_the_wire_format::SC12:
-      stream_args.otw_format = "sc12";
+      stream->dev_params.rx.wfmt = XTRX_WF_12;
       break;
     case radio_configuration::over_the_wire_format::SC8:
-      stream_args.otw_format = "sc8";
+      stream->dev_params.rx.wfmt = XTRX_WF_8;
       break;
   }
-  stream_args.args     = description.args;
-  stream_args.channels = description.ports;
 
-  if (!safe_execution([this, usrp, &stream_args]() {
-        stream          = usrp->get_rx_stream(stream_args);
-        max_packet_size = stream->get_max_num_samps();
-        nof_channels    = stream->get_num_channels();
-      })) {
-    return;
-  }
+  if (xtrx_set_antenna(stream->dev(), XTRX_RX_AUTO)) {
+		throw std::runtime_error("SoapyXTRX::setupStream() set antenna AUTO xtrx_set_antenna() err");
+	}
+
+  xtrx_stop(stream->dev(), XTRX_RX);
 
   state = states::SUCCESSFUL_INIT;
 }
 
-bool radio_xtrx_rx_stream::start(const uhd::time_spec_t& time_spec)
+bool radio_xtrx_rx_stream::start(const baseband_gateway_timestamp& time_spec)
 {
   if (state != states::SUCCESSFUL_INIT) {
     return true;
   }
 
-  if (!safe_execution([this, &time_spec]() {
-        uhd::stream_cmd_t stream_cmd(uhd::stream_cmd_t::STREAM_MODE_START_CONTINUOUS);
-        stream_cmd.time_spec  = time_spec;
-        stream_cmd.stream_now = (time_spec.get_real_secs() == uhd::time_spec_t());
+  stream->dev_params.rx_stream_start = time_spec;
 
-        stream->issue_stream_cmd(stream_cmd);
-      })) {
+  if (xtrx_run_ex(stream->dev(), &stream->dev_params)) {
     printf("Error: failed to start receive stream %d. %s.", id, get_error_message().c_str());
   }
 
@@ -113,12 +132,12 @@ bool radio_xtrx_rx_stream::start(const uhd::time_spec_t& time_spec)
   return true;
 }
 
-bool radio_xtrx_rx_stream::receive(baseband_gateway_buffer& buffs, uhd::time_spec_t& time_spec)
+bool radio_xtrx_rx_stream::receive(baseband_gateway_buffer& buffs, baseband_gateway_timestamp& time_spec)
 {
-  uhd::rx_metadata_t md;
-  unsigned           nsamples            = buffs[0].size();
-  unsigned           rxd_samples_total   = 0;
-  unsigned           timeout_trial_count = 0;
+  xtrx_recv_ex_info md;
+  unsigned          nsamples            = buffs[0].size();
+  unsigned          rxd_samples_total   = 0;
+  unsigned          timeout_trial_count = 0;
 
   // Receive stream in multiple blocks
   while (rxd_samples_total < nsamples) {
@@ -130,7 +149,7 @@ bool radio_xtrx_rx_stream::receive(baseband_gateway_buffer& buffs, uhd::time_spe
 
     // Save timespec for first block.
     if (rxd_samples_total == 0) {
-      time_spec = md.time_spec;
+      time_spec = md.out_first_sample;
     }
 
     // Increment the total amount of received samples.
@@ -144,28 +163,18 @@ bool radio_xtrx_rx_stream::receive(baseband_gateway_buffer& buffs, uhd::time_spe
     event.type                                          = radio_notification_handler::event_type::UNDEFINED;
 
     // Handle error.
-    switch (md.error_code) {
-      case uhd::rx_metadata_t::ERROR_CODE_TIMEOUT:
-        ++timeout_trial_count;
-        if (timeout_trial_count >= 10) {
-          printf("Error: exceeded maximum number of timed out transmissions.\n");
-          return false;
-        }
-        break;
-      case uhd::rx_metadata_t::ERROR_CODE_NONE:
-        // Ignored.
-        break;
-      case uhd::rx_metadata_t::ERROR_CODE_LATE_COMMAND:
-        event.type = radio_notification_handler::event_type::LATE;
-        break;
-      case uhd::rx_metadata_t::ERROR_CODE_OVERFLOW:
-        event.type = radio_notification_handler::event_type::OVERFLOW;
-        break;
-      case uhd::rx_metadata_t::ERROR_CODE_BROKEN_CHAIN:
-      case uhd::rx_metadata_t::ERROR_CODE_ALIGNMENT:
-      case uhd::rx_metadata_t::ERROR_CODE_BAD_PACKET:
-        printf("Error: unhandled error in Rx metadata %s.", md.strerror().c_str());
-        return false;
+    if (md.out_events & RCVEX_EVENT_OVERFLOW) {
+      event.type = radio_notification_handler::event_type::OVERFLOW;
+    }
+    else if (md.out_events & RCVEX_EVENT_FILLED_ZERO) {
+      event.type = radio_notification_handler::event_type::UNDERFLOW;
+    }
+    else if (md.out_events == 0) {
+      // No error code (ignored)
+    }
+    else {
+      printf("Error: unhandled error in Rx metadata.");
+      return false;
     }
 
     // Notify if the event type was set.
@@ -187,14 +196,8 @@ bool radio_xtrx_rx_stream::stop()
   state = states::STOP;
 
   // Try to stop the stream.
-  if (!safe_execution([this]() {
-        uhd::stream_cmd_t stream_cmd(uhd::stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS);
-        stream_cmd.time_spec  = uhd::time_spec_t();
-        stream_cmd.stream_now = true;
-
-        stream->issue_stream_cmd(stream_cmd);
-      })) {
-    printf("Error: failed to stop stream %d. %s.", id, get_error_message().c_str());
+  if (xtrx_stop(stream->dev(), XTRX_TX)) {
+    printf("Something went wrong stopping TX stream");
     return false;
   }
 
