@@ -30,6 +30,10 @@
 #include "zmq/radio_factory_zmq_impl.h"
 #endif // ENABLE_ZMQ
 
+#ifdef ENABLE_XTRX
+#include "xtrx/radio_xtrx_impl.h"
+#endif // ENABLE_XTRX
+
 using namespace srsran;
 
 struct radio_factory_entry {
@@ -43,7 +47,10 @@ static const std::vector<radio_factory_entry> radio_factory_available_factories 
 #endif // ENABLE_UHD
 #ifdef ENABLE_ZMQ
     {"zmq", []() { return std::make_unique<radio_factory_zmq_impl>(); }},
-#endif // ENABLE_UHD
+#endif // ENABLE_ZMQ
+#ifdef ENABLE_XTRX
+    {"xtrx", []() { return std::make_unique<radio_factory_xtrx_impl>(); }},
+#endif // ENABLE_XTRX
 }};
 
 void srsran::print_available_radio_factories()
