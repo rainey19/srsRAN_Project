@@ -57,6 +57,7 @@ option(STOP_ON_WARNING       "Interrupt application on warning"         OFF)
 option(ENABLE_TSAN           "Enable clang thread sanitizer"            OFF)
 option(ENABLE_ASAN           "Enable clang address sanitizer"           OFF)
 option(ENABLE_GCOV           "Enable code coverage"                     OFF)
+option(ENABLE_XTRX           "Enable XTRX"                              ON)
 option(ENABLE_UHD            "Enable UHD"                               ON)
 option(ENABLE_ZEROMQ         "Enable ZeroMQ"                            OFF)
 option(ENABLE_FFTW           "Enable FFTW"                              ON)
@@ -200,6 +201,15 @@ if (ENABLE_UHD)
         link_directories(${UHD_LIBRARY_DIRS})
     endif (UHD_FOUND)
 endif (ENABLE_UHD)
+
+# XTRX
+if (ENABLE_XTRX)
+    find_package(LibXTRX REQUIRED)
+    if (LibXTRX_FOUND)
+        include_directories(${LibXTRX_INCLUDE_DIRS})
+        link_directories(${LibXTRX_LIBRARY_DIRS})
+    endif (LibXTRX_FOUND)
+endif (ENABLE_XTRX)
 
 # Yaml-cpp
 find_package(YAMLCPP)

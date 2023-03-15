@@ -23,6 +23,13 @@ add_library(srsran_radio STATIC radio_factory.cpp)
 set(SRSGNB_RADIO_DEFINITIONS "")
 set(SRSGNB_RADIO_LIBRARIES "")
 
+
+if (LibXTRX_FOUND AND ENABLE_XTRX)
+    add_subdirectory(xtrx)
+    list(APPEND SRSGNB_RADIO_DEFINITIONS -DENABLE_XTRX)
+    list(APPEND SRSGNB_RADIO_LIBRARIES srsran_radio_xtrx)
+endif (LibXTRX_FOUND AND ENABLE_XTRX)
+
 if (UHD_FOUND AND ENABLE_UHD)
     add_subdirectory(uhd)
     list(APPEND SRSGNB_RADIO_DEFINITIONS -DENABLE_UHD)

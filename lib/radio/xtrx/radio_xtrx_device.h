@@ -183,7 +183,7 @@ public:
 		// llreg = XTRXLL_GTIME_SECFRAC;   // GTIME
 		// llreg = XTRXLL_GTIME_OFF;       // GT_OFF
 
-    res = xtrxll_get_sensor(xtrx_handle->dev().lldev, llreg, (int*)&reg_val[0]);
+    res = xtrxll_get_sensor(xtrx_handle->dev()->lldev, llreg, (int*)&reg_val[0]);
 
     if (res)
 			return res;

@@ -20,11 +20,12 @@
 
 set(SOURCES_XTRX
         radio_config_xtrx_validator.cpp
+        radio_xtrx_handle.cpp
         radio_xtrx_impl.cpp
         radio_xtrx_rx_stream.cpp
         radio_xtrx_tx_stream.cpp)
 add_library(srsran_radio_xtrx STATIC ${SOURCES_XTRX})
 
-target_link_libraries(srsran_radio_xtrx ${XTRX_LIBRARIES})
+target_link_libraries(srsran_radio_xtrx ${LibXTRX_LIBRARIES})
 
 install(TARGETS srsran_radio_xtrx EXPORT srsran_export)

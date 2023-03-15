@@ -29,18 +29,18 @@ using namespace srsran;
 bool radio_session_xtrx_impl::set_time_to_gps_time()
 {
   // Get actual sensor value
-  double frac_secs = 0.0;
-  if (!device.get_sensor(sensor_name, frac_secs)) {
-    fmt::print("Error: not possible to read sensor {}. {}\n", sensor_name, device.get_error_message());
-    return false;
-  }
+  // double frac_secs = 0.0;
+  // if (!device.get_sensor(sensor_name, frac_secs)) {
+  //   fmt::print("Error: not possible to read sensor {}. {}\n", sensor_name, device.get_error_message());
+  //   return false;
+  // }
 
-  // Get time and set
-  fmt::print("Setting xtrx_dev time to {}s\n", frac_secs);
-  if (device.set_time_unknown_pps(uhd::time_spec_t(frac_secs)) != UHD_ERROR_NONE) {
-    fmt::print("Error: failed to set time. {}\n", device.get_error_message());
-    return false;
-  }
+  // // Get time and set
+  // fmt::print("Setting xtrx_dev time to {}s\n", frac_secs);
+  // if (device.set_time_unknown_pps(uhd::time_spec_t(frac_secs)) != UHD_ERROR_NONE) {
+  //   fmt::print("Error: failed to set time. {}\n", device.get_error_message());
+  //   return false;
+  // }
 
   return true;
 }
