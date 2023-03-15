@@ -50,11 +50,6 @@ static bool radio_xtrx_device_validate_gain_range(bool TX, double gain)
     return (gain >= 0) && (gain <= 30);
 }
 
-static double to_MHz(double value_Hz)
-{
-  return value_Hz * 1e-6;
-}
-
 namespace srsran {
 
 class radio_xtrx_device : public xtrx_exception_handler
@@ -172,9 +167,9 @@ public:
   bool get_time_now(baseband_gateway_timestamp& timespec)
   {
     uint32_t reg_val[2];
-    uint64_t out_val;
     int res;
     unsigned int llreg;
+    struct xtrxll_dev* lldev = nullptr;
 
     // TODO: maybe I should be tracking gtime in an object like the uhd timespec?
 		// llreg = XTRXLL_OSC_LATCHED;     // OSCLATCH
@@ -183,16 +178,17 @@ public:
 		// llreg = XTRXLL_GTIME_SECFRAC;   // GTIME
 		// llreg = XTRXLL_GTIME_OFF;       // GT_OFF
 
-    res = xtrxll_get_sensor(xtrx_handle->dev()->lldev, llreg, (int*)&reg_val[0]);
+    xtrx_val_get(xtrx_handle->dev(), XTRX_TRX, XTRX_CH_AB, XTRX_UNDERLYING_LL, (uint64_t*)lldev);
+    res = xtrxll_get_sensor(lldev, llreg, (int*)&reg_val[0]);
 
     if (res)
 			return res;
 
 		if (llreg == XTRXLL_GTIME_SECFRAC) {
-			uint64_t v = (uint64_t)d[0] * 1000000000UL + (uint64_t)d[1];
+			uint64_t v = (uint64_t)reg_val[0] * 1000000000UL + (uint64_t)reg_val[1];
 			timespec = v;
 		} else {
-			timespec = d[0]; // CHECK THIS
+			timespec = reg_val[0]; // CHECK THIS
 		}
 
 		return 0;
@@ -204,7 +200,7 @@ public:
     std::string pps;
 
     // Convert clock source to string.
-    xtrx_clock_source_t timing_src;
+    xtrx_clock_source_t timing_src = {};
     switch (config.clock) {
       case radio_configuration::clock_sources::source::DEFAULT:
       case radio_configuration::clock_sources::source::INTERNAL:
@@ -241,54 +237,60 @@ public:
 
   bool set_rx_rate(double rate)
   {
-    logger.debug("Setting Rx Rate to {} MHz.", to_MHz(rate));
+    int ret;
+    logger.debug("Setting Rx Rate to {} MHz.", rate*1e-6);
 
-    return safe_execution([this, rate]() {
+    return safe_execution([this, rate, &ret]() {
       double cgen_freq = 0;
       double cgen_actual, _actual_rx_rate, _actual_tx_rate;
       double _rate = XTRXHandle::clip_range(XTRX_RX, rate);
 
       if (rate != _rate) {
         on_error("Rx Rate {:.2f} MHz is invalid. The nearest valid value is {:.2f}.",
-                 to_MHz(rate),
-                 to_MHz(_rate));
+                 rate*1e-6,
+                 _rate*1e-6);
         return;
       }
 
-      int ret = xtrx_set_samplerate(xtrx_handle->dev(), cgen_freq, _rate, _rate,
+      ret = xtrx_set_samplerate(xtrx_handle->dev(), cgen_freq, _rate, _rate,
 								  0, //XTRX_SAMPLERATE_FORCE_UPDATE,
                   // (soft_filter) ? XTRX_SAMPLERATE_FORCE_TX_INTR | XTRX_SAMPLERATE_FORCE_RX_DECIM : 0,
 								  &cgen_actual, &_actual_rx_rate, &_actual_tx_rate);
 
-      fprintf(stderr, "trx_xtrx_get_sample_rate set=%d act=%d master=%.3f MHz\n",
+      fprintf(stderr, "trx_xtrx_get_sample_rate set=%.0f act=%.0f master=%.3f MHz\n",
 			        _rate, _actual_rx_rate, cgen_actual / 1e6);
     });
+
+    return ret;
   }
 
   bool set_tx_rate(double rate)
   {
-    logger.debug("Setting Tx Rate to {} MHz.", to_MHz(rate));
+    int ret;
+    logger.debug("Setting Tx Rate to {} MHz.", rate*1e-6);
 
-    return safe_execution([this, rate]() {
+    return safe_execution([this, rate, &ret]() {
       double cgen_freq = 0;
-      double cgen_actual, _actual_tx_rate, _actual_tx_rate;
+      double cgen_actual, _actual_rx_rate, _actual_tx_rate;
       double _rate = XTRXHandle::clip_range(XTRX_TX, rate);
 
       if (rate != _rate) {
         on_error("Tx Rate {:.2f} MHz is invalid. The nearest valid value is {:.2f}.",
-                 to_MHz(rate),
-                 to_MHz(_rate));
+                 rate*1e-6,
+                 _rate*1e-6);
         return;
       }
 
-      int ret = xtrx_set_samplerate(xtrx_handle->dev(), cgen_freq, _rate, _rate,
+      ret = xtrx_set_samplerate(xtrx_handle->dev(), cgen_freq, _rate, _rate,
 								  0, //XTRX_SAMPLERATE_FORCE_UPDATE,
                   // (soft_filter) ? XTRX_SAMPLERATE_FORCE_TX_INTR | XTRX_SAMPLERATE_FORCE_TX_DECIM : 0,
-								  &cgen_actual, &_actual_tx_rate, &_actual_tx_rate);
+								  &cgen_actual, &_actual_rx_rate, &_actual_tx_rate);
 
-      fprintf(stderr, "trx_xtrx_get_sample_rate set=%d act=%d master=%.3f MHz\n",
+      fprintf(stderr, "trx_xtrx_get_sample_rate set=%.0f act=%.0f master=%.3f MHz\n",
 			        _rate, _actual_tx_rate, cgen_actual / 1e6);
     });
+
+    return ret;
   }
 
 // TODO (or not?)
@@ -330,8 +332,6 @@ public:
     logger.debug("Setting channel {} Tx gain to {:.2f} dB.", ch, gain);
 
     return safe_execution([this, ch, gain]() {
-      int res;
-
       if (!radio_xtrx_device_validate_gain_range(1, gain)) {
         on_error("Tx gain (i.e., {} dB) is out-of-range. Range is [{}, {}] dB in steps of {} dB.",
                  gain,
@@ -341,7 +341,8 @@ public:
         return;
       }
 
-      if (res = xtrx_set_gain(xtrx_handle->dev(), XTRXHandle::xtrx_channel(ch), XTRX_TX_PAD_GAIN, gain, NULL)) {
+      int res = xtrx_set_gain(xtrx_handle->dev(), XTRXHandle::xtrx_channel(ch), XTRX_TX_PAD_GAIN, gain, NULL);
+      if (res) {
         on_error("XTRX failed to set TX gain (returned {})",
                  res);
       }
@@ -355,8 +356,6 @@ public:
     logger.debug("Setting channel {} Rx gain to {:.2f} dB.", ch, gain);
 
     return safe_execution([this, ch, gain]() {
-      int res;
-
       if (!radio_xtrx_device_validate_gain_range(0, gain)) {
         on_error("Rx gain (i.e., {} dB) is out-of-range. Range is [{}, {}] dB in steps of {} dB.",
                  gain,
@@ -366,7 +365,8 @@ public:
         return;
       }
 
-      if (res = xtrx_set_gain(xtrx_handle->dev(), XTRXHandle::xtrx_channel(ch), XTRX_RX_LNA_GAIN, gain, NULL)) {
+      int res = xtrx_set_gain(xtrx_handle->dev(), XTRXHandle::xtrx_channel(ch), XTRX_RX_LNA_GAIN, gain, NULL);
+      if (res) {
         on_error("XTRX failed to set RX gain (returned {})",
                  res);
       }
@@ -375,47 +375,47 @@ public:
 
   bool set_tx_freq(uint32_t ch, const radio_configuration::lo_frequency& config)
   {
-    logger.debug("Setting channel {} Tx frequency to {} MHz.", ch, to_MHz(config.center_frequency_hz));
+    logger.debug("Setting channel {} Tx frequency to {} MHz.", ch, config.center_frequency_hz*1e-6);
 
     return safe_execution([this, ch, &config]() {
       if (!radio_xtrx_device_validate_freq_range(config.center_frequency_hz)) {
         on_error("Tx RF frequency {} MHz is out-of-range. Range is {} - {}.",
-                 to_MHz(config.center_frequency_hz),
-                 to_MHz(30e6),
-                 to_MHz(3.8e9));
+                 config.center_frequency_hz*1e-6,
+                 30,
+                 3.8e3);
         return;
       }
 
       double _actual_rf_tx = 0;
-      int res;
-      if (res = xtrx_tune(xtrx_handle->dev(), XTRX_TUNE_TX_FDD, config.center_frequency_hz, &_actual_rf_tx)) {
+      int res = xtrx_tune(xtrx_handle->dev(), XTRX_TUNE_TX_FDD, config.center_frequency_hz, &_actual_rf_tx);
+      if (res) {
         on_error("XTRX failed to tune TX (returned {})",
                  res);
       }
-      logger.debug("Result: channel {} Tx frequency actual = {} MHz.", ch, to_MHz(_actual_rf_tx));
+      logger.debug("Result: channel {} Tx frequency actual = {} MHz.", ch, _actual_rf_tx*1e-6);
     });
   }
 
   bool set_rx_freq(uint32_t ch, const radio_configuration::lo_frequency& config)
   {
-    logger.debug("Setting channel {} Rx frequency to {} MHz.", ch, to_MHz(config.center_frequency_hz));
+    logger.debug("Setting channel {} Rx frequency to {} MHz.", ch, config.center_frequency_hz*1e-6);
 
     return safe_execution([this, ch, &config]() {
       if (!radio_xtrx_device_validate_freq_range(config.center_frequency_hz)) {
         on_error("Rx RF frequency {} MHz is out-of-range. Range is {} - {}.",
-                 to_MHz(config.center_frequency_hz),
-                 to_MHz(30e6),
-                 to_MHz(3.8e9));
+                 config.center_frequency_hz,
+                 30,
+                 3.8e3);
         return;
       }
 
       double _actual_rf_rx = 0;
-      int res;
-      if (res = xtrx_tune(xtrx_handle->dev(), XTRX_TUNE_RX_FDD, config.center_frequency_hz, &_actual_rf_rx)) {
+      int res = xtrx_tune(xtrx_handle->dev(), XTRX_TUNE_RX_FDD, config.center_frequency_hz, &_actual_rf_rx);
+      if (res) {
         on_error("XTRX failed to tune RX (returned {})",
                  res);
       }
-      logger.debug("Result: channel {} Rx frequency actual = {} MHz.", ch, to_MHz(_actual_rf_rx));
+      logger.debug("Result: channel {} Rx frequency actual = {} MHz.", ch, _actual_rf_rx*1e-6);
     });
   }
 

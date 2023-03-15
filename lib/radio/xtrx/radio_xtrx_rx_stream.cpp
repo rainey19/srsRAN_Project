@@ -137,7 +137,6 @@ bool radio_xtrx_rx_stream::receive(baseband_gateway_buffer& buffs, baseband_gate
   xtrx_recv_ex_info md;
   unsigned          nsamples            = buffs[0].size();
   unsigned          rxd_samples_total   = 0;
-  unsigned          timeout_trial_count = 0;
 
   // Receive stream in multiple blocks
   while (rxd_samples_total < nsamples) {

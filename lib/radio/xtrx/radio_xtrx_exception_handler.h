@@ -57,14 +57,8 @@ public:
     // Try to execute task and catch exception.
     try {
       task();
-    } catch (const uhd::exception& e) {
-      error_message = e.what();
-      return false;
     } catch (const boost::exception& e) {
       error_message = boost::diagnostic_information(e);
-      return false;
-    } catch (const std::exception& e) {
-      error_message = e.what();
       return false;
     } catch (...) {
       error_message = "Unrecognized exception caught.";

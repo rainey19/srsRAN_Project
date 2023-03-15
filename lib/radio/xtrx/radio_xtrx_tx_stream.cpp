@@ -52,8 +52,8 @@ bool radio_xtrx_tx_stream::transmit_block(unsigned&                  nof_txd_sam
 
   // Safe transmission.
   int res = safe_execution([this, &metadata, &nof_txd_samples]() {
-    int res_;
-    if (res_ = xtrx_send_sync_ex(stream->dev(), &metadata)) { fprintf(stderr, "trx_xtrx_write: xtrx_send_burst_sync err=%d\n", res_); }
+    int res_ = xtrx_send_sync_ex(stream->dev(), &metadata);
+    if (res_) { fprintf(stderr, "trx_xtrx_write: xtrx_send_burst_sync err=%d\n", res_); }
     nof_txd_samples = metadata.out_samples;
   });
 

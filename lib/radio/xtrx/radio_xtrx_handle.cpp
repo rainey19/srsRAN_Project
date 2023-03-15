@@ -40,7 +40,7 @@ XTRXHandle::~XTRXHandle()
 
 double XTRXHandle::clip_range(xtrx_direction_t dir, double rate)
 {
-	double ret;
+	double ret = rate;
 	if (dir == XTRX_RX)
 	{
 		if (rate < 0.2e6) {
