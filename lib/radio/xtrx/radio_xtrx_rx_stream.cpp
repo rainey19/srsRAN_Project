@@ -59,24 +59,27 @@ bool radio_xtrx_rx_stream::receive_block(unsigned&               nof_rxd_samples
   int res = xtrx_recv_sync_ex(stream->dev(), &metadata);
   if (res) {
     fprintf(stderr, "trx_xtrx_read: xtrx_recv_sync count=%d err=%d\n", num_samples, res);
+	  return false;
   }
   nof_rxd_samples = metadata.out_samples;
 
-	return res;
+  return true;
 }
 
 radio_xtrx_rx_stream::radio_xtrx_rx_stream(std::shared_ptr<XTRXHandle>& xtrx_handle,
                                          const stream_description&      description,
                                          radio_notification_handler&    notifier_) :
-  id(description.id), notifier(notifier_)
+  id(description.id),
+  notifier(notifier_),
+  nof_channels(description.ports.size())
 {
   // Build stream arguments.
-  stream = xtrx_handle.get();
+  stream = xtrx_handle;
 
   stream->dev_params.rx.hfmt = XTRX_IQ_FLOAT32;
   stream->dev_params.rx.flags = 0;
-	stream->dev_params.rx.paketsize = 1024;
-  stream->dev_params.dir = XTRX_RX;
+	stream->dev_params.rx.paketsize = 8192;
+  stream->dev_params.dir = XTRX_TRX;
 	stream->dev_params.nflags = 0;
 
   switch (nof_channels) {
@@ -114,7 +117,7 @@ radio_xtrx_rx_stream::radio_xtrx_rx_stream(std::shared_ptr<XTRXHandle>& xtrx_han
   state = states::SUCCESSFUL_INIT;
 }
 
-bool radio_xtrx_rx_stream::start(const baseband_gateway_timestamp& time_spec)
+bool __attribute__((optimize("O0"))) radio_xtrx_rx_stream::start(const baseband_gateway_timestamp& time_spec)
 {
   if (state != states::SUCCESSFUL_INIT) {
     return true;
@@ -124,6 +127,7 @@ bool radio_xtrx_rx_stream::start(const baseband_gateway_timestamp& time_spec)
 
   if (xtrx_run_ex(stream->dev(), &stream->dev_params)) {
     printf("Error: failed to start receive stream %d. %s.", id, get_error_message().c_str());
+    return false;
   }
 
   // Transition to streaming state.
@@ -195,8 +199,8 @@ bool radio_xtrx_rx_stream::stop()
   state = states::STOP;
 
   // Try to stop the stream.
-  if (xtrx_stop(stream->dev(), XTRX_TX)) {
-    printf("Something went wrong stopping TX stream");
+  if (xtrx_stop(stream->dev(), XTRX_RX)) {
+    printf("Something went wrong stopping RX stream");
     return false;
   }
 

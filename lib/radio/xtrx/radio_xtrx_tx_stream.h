@@ -48,7 +48,7 @@ private:
   /// Radio notification interface.
   radio_notification_handler& notifier;
   /// Owns the xtrx Tx stream.
-  XTRXHandle* stream;
+  std::shared_ptr<XTRXHandle> stream;
   /// Protects concurrent stream transmit.
   std::mutex stream_transmit_mutex;
   /// Sampling rate in Hz.

@@ -19,6 +19,7 @@ public:
 	static double clip_range(xtrx_direction_t dir, double rate);
 
 	static xtrx_channel_t xtrx_channel(int ch);
+	bool get_ll(struct xtrxll_dev** lldev);
 
 	XTRXHandle() = delete;
 	XTRXHandle(const std::string& name);

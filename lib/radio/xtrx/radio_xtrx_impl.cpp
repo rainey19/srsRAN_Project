@@ -177,7 +177,7 @@ bool radio_session_xtrx_impl::start_rx_stream()
   baseband_gateway_timestamp time_spec;
 
   // Get current xtrx_dev time as timestamp.
-  if (!device.get_time_now(time_spec)) {
+  if (device.get_time_now(time_spec)) {
     fmt::print("Error: getting time to start stream. {}.\n", device.get_error_message());
     return false;
   }
@@ -194,12 +194,13 @@ bool radio_session_xtrx_impl::start_rx_stream()
   return true;
 }
 
-radio_session_xtrx_impl::radio_session_xtrx_impl(const radio_configuration::radio& radio_config,
+__attribute__((optimize("O0"))) radio_session_xtrx_impl::radio_session_xtrx_impl(const radio_configuration::radio& radio_config,
                                                task_executor&                    async_executor_,
                                                radio_notification_handler&       notifier_) :
   sampling_rate_hz(radio_config.sampling_rate_hz), async_executor(async_executor_), notifier(notifier_)
 {
   // Set the logging level.
+xtrx_log_setlevel(3, "DEF");
 #ifdef XTRX_LOG_INFO
   int severity_level = 0;
   if (!radio_config.log_level.empty()) {
@@ -235,7 +236,7 @@ radio_session_xtrx_impl::radio_session_xtrx_impl(const radio_configuration::radi
   }
 
   // Open device.
-  if (!device.xtrx_dev_make(radio_config.args)) {
+  if (device.xtrx_dev_make(radio_config.args)) {
     fmt::print("Failed to open device with address '{}': {}\n", radio_config.args, device.get_error_message());
     return;
   }
@@ -244,7 +245,7 @@ radio_session_xtrx_impl::radio_session_xtrx_impl(const radio_configuration::radi
   std::string sensor_name;
 
   // Set sync source.
-  if (!device.set_sync_source(radio_config.clock)) {
+  if (device.set_sync_source(radio_config.clock)) {
     return;
   }
 

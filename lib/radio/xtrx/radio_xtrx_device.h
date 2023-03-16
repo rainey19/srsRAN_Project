@@ -59,9 +59,11 @@ public:
 
   bool is_valid() const { return xtrx_handle != nullptr; }
 
-  bool xtrx_dev_make(const std::string& device_address)
+  bool __attribute__((optimize("O0"))) xtrx_dev_make(const std::string& device_address)
   {
     std::string dev_addr;
+    uint64_t val;
+    int res;
     
     // Destroy any previous xtrx_handle instance
     xtrx_handle = nullptr;
@@ -75,9 +77,12 @@ public:
 
     fmt::print("Making xtrx_handle object with args '{}'\n", dev_addr);
 
-    return safe_execution([this, &dev_addr]() {
-      xtrx_handle = XTRXHandle::get(dev_addr);
-    });
+    xtrx_handle = XTRXHandle::get(dev_addr);
+
+    res = xtrx_val_get(xtrx_handle->dev(), XTRX_TRX, XTRX_CH_ALL, XTRX_BOARD_TEMP, &val);
+    printf("XTRX current board temp %.2f C\n", ((double)val / 256.0));
+
+    return res;
   }
 
   bool get_mboard_sensor_names(std::vector<std::string>& sensors)
@@ -164,37 +169,38 @@ public:
     });
   }
 
-  bool get_time_now(baseband_gateway_timestamp& timespec)
+  bool __attribute__((optimize("O0"))) get_time_now(baseband_gateway_timestamp& timespec)
   {
     uint32_t reg_val[2];
-    int res;
     unsigned int llreg;
-    struct xtrxll_dev* lldev = nullptr;
+    struct xtrxll_dev* lldev = {}; // TODO make nullptr to avoid mem leak?
 
     // TODO: maybe I should be tracking gtime in an object like the uhd timespec?
 		// llreg = XTRXLL_OSC_LATCHED;     // OSCLATCH
-		llreg = XTRXLL_RX_TIME;         // RXTIME
+		// llreg = XTRXLL_RX_TIME;         // RXTIME
 		// llreg = XTRXLL_TX_TIME;         // TXTIME
-		// llreg = XTRXLL_GTIME_SECFRAC;   // GTIME
+		llreg = XTRXLL_GTIME_SECFRAC;   // GTIME
 		// llreg = XTRXLL_GTIME_OFF;       // GT_OFF
 
-    xtrx_val_get(xtrx_handle->dev(), XTRX_TRX, XTRX_CH_AB, XTRX_UNDERLYING_LL, (uint64_t*)lldev);
-    res = xtrxll_get_sensor(lldev, llreg, (int*)&reg_val[0]);
-
-    if (res)
-			return res;
+    if (xtrx_handle->get_ll(&lldev)) {
+      return 1;
+    }
+    if (xtrxll_get_sensor(lldev, llreg, (int*)&reg_val[0])) {
+      return 1;
+    }
 
 		if (llreg == XTRXLL_GTIME_SECFRAC) {
-			uint64_t v = (uint64_t)reg_val[0] * 1000000000UL + (uint64_t)reg_val[1];
-			timespec = v;
+      // sec = reg_val[0];
+      // ns in ticks = reg_val[1];
+			timespec = (uint64_t)reg_val[1];
 		} else {
-			timespec = reg_val[0]; // CHECK THIS
+			timespec = reg_val[0];
 		}
 
 		return 0;
   }
 
-  bool set_sync_source(const radio_configuration::clock_sources& config)
+  bool __attribute__((optimize("O0"))) set_sync_source(const radio_configuration::clock_sources& config)
   {
     std::string clk;
     std::string pps;
@@ -232,7 +238,9 @@ public:
 
     logger.debug("Setting PPS source to '{}' and clock source to '{}'.", pps, clk);
 
-    return xtrx_set_ref_clk(xtrx_handle->dev(), 0, timing_src);
+    auto devvv = xtrx_handle->dev();
+    int retval = xtrx_set_ref_clk(devvv, 0, timing_src);
+    return retval;
   }
 
   bool set_rx_rate(double rate)

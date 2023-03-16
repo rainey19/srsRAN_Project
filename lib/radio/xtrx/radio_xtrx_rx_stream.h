@@ -48,7 +48,7 @@ private:
   /// Radio notification interface.
   radio_notification_handler& notifier;
   /// Owns the XTRX Tx stream.
-  XTRXHandle* stream;
+  std::shared_ptr<XTRXHandle> stream;
   /// Maximum number of samples in a single packet.
   unsigned max_packet_size;
   /// Indicates the number of channels.

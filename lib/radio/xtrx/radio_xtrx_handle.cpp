@@ -86,3 +86,8 @@ xtrx_channel_t XTRXHandle::xtrx_channel(int ch)
 		return XTRX_CH_AB;
 	}
 }
+
+bool XTRXHandle::get_ll(struct xtrxll_dev** lldev)
+{
+    return xtrx_val_get(_dev, XTRX_TRX, XTRX_CH_AB, XTRX_UNDERLYING_LL, (uint64_t*)lldev);
+}

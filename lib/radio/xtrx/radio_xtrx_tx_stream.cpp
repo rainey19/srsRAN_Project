@@ -24,7 +24,7 @@
 
 using namespace srsran;
 
-bool radio_xtrx_tx_stream::transmit_block(unsigned&                  nof_txd_samples,
+bool __attribute__((optimize("O0"))) radio_xtrx_tx_stream::transmit_block(unsigned&                  nof_txd_samples,
                                          baseband_gateway_buffer&    buffs,
                                          unsigned                    buffer_offset,
                                          baseband_gateway_timestamp& time_spec)
@@ -34,6 +34,7 @@ bool radio_xtrx_tx_stream::transmit_block(unsigned&                  nof_txd_sam
 
   // Extract number of samples.
   unsigned num_samples = buffs[0].size() - buffer_offset;
+  // printf("Asking to send %d samples\n", num_samples);
 
   // Make sure the number of channels is equal.
   report_fatal_error_if_not(buffs.get_nof_channels() == nof_channels, "Number of channels does not match.");
@@ -46,7 +47,7 @@ bool radio_xtrx_tx_stream::transmit_block(unsigned&                  nof_txd_sam
 
   metadata.buffer_count = nof_channels;
   metadata.buffers = buffs_flat_ptr.data();
-  metadata.flags = XTRX_TX_DONT_BUFFER;
+  metadata.flags = XTRX_TX_DONT_BUFFER | XTRX_TX_NO_DISCARD;
   metadata.samples = num_samples;
   metadata.ts = time_spec;
 
@@ -84,7 +85,7 @@ bool radio_xtrx_tx_stream::transmit_block(unsigned&                  nof_txd_sam
   return res;
 }
 
-radio_xtrx_tx_stream::radio_xtrx_tx_stream(std::shared_ptr<XTRXHandle>& xtrx_handle,
+__attribute__((optimize("O0"))) radio_xtrx_tx_stream::radio_xtrx_tx_stream(std::shared_ptr<XTRXHandle>& xtrx_handle,
                                          const stream_description&      description,
                                          task_executor&                 async_executor_,
                                          radio_notification_handler&    notifier_) :
@@ -95,39 +96,40 @@ radio_xtrx_tx_stream::radio_xtrx_tx_stream(std::shared_ptr<XTRXHandle>& xtrx_han
   nof_channels(description.ports.size())
 {
   // Build stream arguments.
-  stream = xtrx_handle.get();
+  stream = xtrx_handle;
+  auto params = &stream->dev_params;
 
-  stream->dev_params.tx.hfmt = XTRX_IQ_FLOAT32;
-  stream->dev_params.tx.flags = 0;
-	stream->dev_params.tx.paketsize = 1024;
-  stream->dev_params.tx_repeat_buf = NULL;
-  stream->dev_params.dir = XTRX_TX;
-	stream->dev_params.nflags = 0;
+  params->tx.hfmt = XTRX_IQ_FLOAT32;
+  params->tx.flags = 0;
+	params->tx.paketsize = 8192;
+  params->tx_repeat_buf = NULL;
+  params->dir = XTRX_TRX;
+	params->nflags = 0;
 
   switch (nof_channels)
   {
     default:
     case 1:
-      stream->dev_params.tx.flags |= XTRX_RSP_SISO_MODE;
-      stream->dev_params.tx.chs = XTRX_CH_A;
+      params->tx.flags |= XTRX_RSP_SISO_MODE;
+      params->tx.chs = XTRX_CH_A;
       break;
     case 2:
-      stream->dev_params.tx.chs = XTRX_CH_AB;
+      params->tx.chs = XTRX_CH_AB;
       if (description.ports[0] == 1 && description.ports[1] == 0)
-        stream->dev_params.rx.flags |= XTRX_RSP_SWAP_AB;
+        params->rx.flags |= XTRX_RSP_SWAP_AB;
       break;
   }
 
   switch (description.otw_format) {
     case radio_configuration::over_the_wire_format::DEFAULT:
     case radio_configuration::over_the_wire_format::SC16:
-      stream->dev_params.tx.wfmt = XTRX_WF_16;
+      params->tx.wfmt = XTRX_WF_16;
       break;
     case radio_configuration::over_the_wire_format::SC12:
-      stream->dev_params.tx.wfmt = XTRX_WF_12;
+      params->tx.wfmt = XTRX_WF_12;
       break;
     case radio_configuration::over_the_wire_format::SC8:
-      stream->dev_params.tx.wfmt = XTRX_WF_8;
+      params->tx.wfmt = XTRX_WF_8;
       break;
   }	
 
@@ -137,11 +139,11 @@ radio_xtrx_tx_stream::radio_xtrx_tx_stream(std::shared_ptr<XTRXHandle>& xtrx_han
 		throw std::runtime_error("SoapyXTRX::setupStream() set antenna AUTO xtrx_set_antenna() err");
 	}
 
-  if (xtrx_tune_tx_bandwidth(stream->dev(), stream->dev_params.tx.chs, description.srate_hz, NULL)) {
+  if (xtrx_tune_tx_bandwidth(stream->dev(), params->tx.chs, description.srate_hz, NULL)) {
 		throw std::runtime_error("SoapyXTRX::setupStream() xtrx_tune_tx_bandwidth err");
   }
 
-	// if (xtrx_run_ex(stream->dev(), &stream->dev_params)) {
+	// if (xtrx_run_ex(stream->dev(), params)) {
   //   throw std::runtime_error("SoapyXTRX::setupStream() xtrx_run_ex err");
 	// }
 
