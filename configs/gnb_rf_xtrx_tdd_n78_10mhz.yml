@@ -8,8 +8,8 @@ rf_driver:
   clock:                            # Specify the clock source used by the RF.
   sync:                             # Specify the sync source used by the RF.
   srate: 11.52                      # RF sample rate might need to be adjusted according to selected bandwidth.
-  tx_gain: 0                       # Transmit gain of the RF might need to adjusted to the given situation.
-  rx_gain: 0                       # Receive gain of the RF might need to adjusted to the given situation.
+  tx_gain: 0                        # Transmit gain of the RF might need to adjusted to the given situation.
+  rx_gain: 0                        # Receive gain of the RF might need to adjusted to the given situation.
 
 cell_cfg:
   dl_arfcn: 632628                  # ARFCN of the downlink carrier (center frequency).
@@ -23,6 +23,7 @@ cell_cfg:
 log:
   filename: /tmp/gnb.log            # Path of the log file.
   all_level: warning                # Logging level applied to all layers.
+  radio_level: debug                # Logging level applied to the radio layer.
 
 pcap:
   mac_enable: false                 # Set to true to enable MAC-layer PCAPs.
