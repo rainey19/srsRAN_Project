@@ -264,6 +264,7 @@ public:
 								  0, //XTRX_SAMPLERATE_FORCE_UPDATE,
                   // (soft_filter) ? XTRX_SAMPLERATE_FORCE_TX_INTR | XTRX_SAMPLERATE_FORCE_RX_DECIM : 0,
 								  &cgen_actual, &_actual_rx_rate, &_actual_tx_rate);
+      xtrx_tune_rx_bandwidth(xtrx_handle->dev(), XTRX_CH_AB, 10e6, NULL); // TODO: set the bandwidth properly
 
       fprintf(stderr, "trx_xtrx_get_sample_rate set=%.0f act=%.0f master=%.3f MHz\n",
 			        _rate, _actual_rx_rate, cgen_actual / 1e6);
@@ -293,6 +294,7 @@ public:
 								  0, //XTRX_SAMPLERATE_FORCE_UPDATE,
                   // (soft_filter) ? XTRX_SAMPLERATE_FORCE_TX_INTR | XTRX_SAMPLERATE_FORCE_TX_DECIM : 0,
 								  &cgen_actual, &_actual_rx_rate, &_actual_tx_rate);
+      xtrx_tune_tx_bandwidth(xtrx_handle->dev(), XTRX_CH_AB, 10e6, NULL); // TODO: set the bandwidth properly
 
       fprintf(stderr, "trx_xtrx_get_sample_rate set=%.0f act=%.0f master=%.3f MHz\n",
 			        _rate, _actual_tx_rate, cgen_actual / 1e6);
