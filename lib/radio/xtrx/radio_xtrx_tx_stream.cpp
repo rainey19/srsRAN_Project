@@ -24,11 +24,15 @@
 
 using namespace srsran;
 
-bool __attribute__((optimize("O0"))) radio_xtrx_tx_stream::transmit_block(unsigned&                  nof_txd_samples,
+bool radio_xtrx_tx_stream::transmit_block(unsigned&                  nof_txd_samples,
                                          baseband_gateway_buffer&    buffs,
                                          unsigned                    buffer_offset,
                                          baseband_gateway_timestamp& time_spec)
 {
+  if (state_fsm.is_stopped()) {
+    return false;
+  }
+
   // Prepare metadata.
   xtrx_send_ex_info_t metadata = {0};
 
@@ -47,9 +51,9 @@ bool __attribute__((optimize("O0"))) radio_xtrx_tx_stream::transmit_block(unsign
 
   metadata.buffer_count = nof_channels;
   metadata.buffers = buffs_flat_ptr.data();
-  metadata.flags = XTRX_TX_DONT_BUFFER | XTRX_TX_NO_DISCARD;
+  metadata.flags = XTRX_TX_NO_DISCARD; // | XTRX_TX_DONT_BUFFER;
   metadata.samples = num_samples;
-  metadata.ts = time_spec;
+  metadata.ts = time_spec;// - stream->dev_params.rx_stream_start;
 
   // Safe transmission.
   int res = safe_execution([this, &metadata, &nof_txd_samples]() {
@@ -85,7 +89,7 @@ bool __attribute__((optimize("O0"))) radio_xtrx_tx_stream::transmit_block(unsign
   return res;
 }
 
-__attribute__((optimize("O0"))) radio_xtrx_tx_stream::radio_xtrx_tx_stream(std::shared_ptr<XTRXHandle>& xtrx_handle,
+radio_xtrx_tx_stream::radio_xtrx_tx_stream(std::shared_ptr<XTRXHandle>& xtrx_handle,
                                          const stream_description&      description,
                                          task_executor&                 async_executor_,
                                          radio_notification_handler&    notifier_) :
@@ -101,7 +105,7 @@ __attribute__((optimize("O0"))) radio_xtrx_tx_stream::radio_xtrx_tx_stream(std::
 
   params->tx.hfmt = XTRX_IQ_FLOAT32;
   params->tx.flags = 0;
-	params->tx.paketsize = 8192;
+	params->tx.paketsize = 4196;
   params->tx_repeat_buf = NULL;
   params->dir = XTRX_TRX;
 	params->nflags = 0;
@@ -168,7 +172,7 @@ bool radio_xtrx_tx_stream::transmit(baseband_gateway_buffer& data, baseband_gate
     }
 
     // Save timespec for first block.
-    time_spec += txd_samples * srate_hz;
+    time_spec += txd_samples;
 
     // Increment the total amount of received samples.
     txd_samples_total += txd_samples;

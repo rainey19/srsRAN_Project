@@ -78,7 +78,7 @@ radio_xtrx_rx_stream::radio_xtrx_rx_stream(std::shared_ptr<XTRXHandle>& xtrx_han
 
   stream->dev_params.rx.hfmt = XTRX_IQ_FLOAT32;
   stream->dev_params.rx.flags = 0;
-	stream->dev_params.rx.paketsize = 8192;
+	stream->dev_params.rx.paketsize = 4196;
   stream->dev_params.dir = XTRX_TRX;
 	stream->dev_params.nflags = 0;
 
@@ -117,7 +117,7 @@ radio_xtrx_rx_stream::radio_xtrx_rx_stream(std::shared_ptr<XTRXHandle>& xtrx_han
   state = states::SUCCESSFUL_INIT;
 }
 
-bool __attribute__((optimize("O0"))) radio_xtrx_rx_stream::start(const baseband_gateway_timestamp& time_spec)
+bool radio_xtrx_rx_stream::start(const baseband_gateway_timestamp& time_spec)
 {
   if (state != states::SUCCESSFUL_INIT) {
     return true;
