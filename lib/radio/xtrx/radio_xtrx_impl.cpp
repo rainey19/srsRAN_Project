@@ -200,7 +200,7 @@ __attribute__((optimize("O0"))) radio_session_xtrx_impl::radio_session_xtrx_impl
   sampling_rate_hz(radio_config.sampling_rate_hz), async_executor(async_executor_), notifier(notifier_)
 {
   // Set the logging level.
-xtrx_log_setlevel(3, "DEF");
+xtrx_log_setlevel(2, "DEF");
 #ifdef XTRX_LOG_INFO
   int severity_level = 0;
   if (!radio_config.log_level.empty()) {
@@ -211,13 +211,13 @@ xtrx_log_setlevel(3, "DEF");
     }
 
     if (log_level == "WARNING") {
-      severity_level = 0;
-    } else if (log_level == "INFO") {
-      severity_level = 1;
-    } else if (log_level == "DEBUG") {
       severity_level = 2;
-    } else if (log_level == "TRACE") {
+    } else if (log_level == "INFO") {
       severity_level = 3;
+    } else if (log_level == "DEBUG") {
+      severity_level = 5;
+    } else if (log_level == "TRACE") {
+      severity_level = 7;
     } else {
       severity_level = 0;
     }
