@@ -59,7 +59,7 @@ public:
 
   bool is_valid() const { return xtrx_handle != nullptr; }
 
-  bool __attribute__((optimize("O0"))) xtrx_dev_make(const std::string& device_address)
+  bool xtrx_dev_make(const std::string& device_address)
   {
     std::string dev_addr;
     uint64_t val;
@@ -169,7 +169,7 @@ public:
     });
   }
 
-  bool __attribute__((optimize("O0"))) get_time_now(baseband_gateway_timestamp& timespec)
+  bool get_time_now(baseband_gateway_timestamp& timespec)
   {
     uint32_t reg_val[2];
     unsigned int llreg;
@@ -200,7 +200,7 @@ public:
 		return 0;
   }
 
-  bool __attribute__((optimize("O0"))) set_sync_source(const radio_configuration::clock_sources& config)
+  bool set_sync_source(const radio_configuration::clock_sources& config)
   {
     std::string clk;
     std::string pps;

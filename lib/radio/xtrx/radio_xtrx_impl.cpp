@@ -194,7 +194,7 @@ bool radio_session_xtrx_impl::start_rx_stream()
   return true;
 }
 
-__attribute__((optimize("O0"))) radio_session_xtrx_impl::radio_session_xtrx_impl(const radio_configuration::radio& radio_config,
+radio_session_xtrx_impl::radio_session_xtrx_impl(const radio_configuration::radio& radio_config,
                                                task_executor&                    async_executor_,
                                                radio_notification_handler&       notifier_) :
   sampling_rate_hz(radio_config.sampling_rate_hz), async_executor(async_executor_), notifier(notifier_)
