@@ -1,6 +1,6 @@
 amf:
-  addr: 127.0.1.100                 # The address or hostname of the AMF.
-  bind_addr: 127.0.0.1              # A local IP that the gNB binds to for traffic from the AMF.
+  addr: 192.168.1.48                # The address or hostname of the AMF.
+  bind_addr: 192.168.1.146          # A local IP that the gNB binds to for traffic from the AMF.
 
 rf_driver:
   device_driver: xtrx               # The RF driver name.
@@ -16,7 +16,7 @@ cell_cfg:
   band: 78                          # The NR band.
   channel_bandwidth_MHz: 10         # Bandwith in MHz. Number of PRBs will be automatically derived.
   common_scs: 30                    # Subcarrier spacing in kHz used for data.
-  plmn: "00101"                     # PLMN broadcasted by the gNB.
+  plmn: "90170"                     # PLMN broadcasted by the gNB.
   tac: 7                            # Tracking area code (needs to match the core configuration).
   pci: 1                            # Physical cell ID.
       
