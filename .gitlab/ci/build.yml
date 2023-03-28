@@ -19,8 +19,8 @@
 #
 
 include:
-  - project: softwareradiosystems/testing-tools
-    ref: "45"
+  - project: softwareradiosystems/ci/tools
+    ref: "2"
     file: .gitlab/ci-shared/setup/all.yml
 
 stages:
@@ -34,7 +34,7 @@ stages:
     - ${SRS_INFRASTRUCTURE_TAG}-${PLATFORM}
   stage: build and unit tests
   variables:
-    DOCKER_BUILDER_VERSION: "1.7.4"
+    DOCKER_BUILDER_VERSION: "1.7.7"
     # General
     OS: ubuntu-22.04
     # Build
@@ -45,7 +45,7 @@ stages:
     ENABLE_EXPORT: "" # Empty for cmake default
     ENABLE_FFTW: "" # Empty for cmake default
     ENABLE_UHD: "" # Empty for cmake default
-    ENABLE_ZERO_MQ: "" # Empty for cmake default
+    ENABLE_ZEROMQ: "True" # Empty for cmake default
     ENABLE_ASAN: "" # Empty for cmake default
     ENABLE_TSAN: "" # Empty for cmake default
     ENABLE_GCOV: "" # Empty for cmake default
@@ -79,8 +79,8 @@ stages:
         if [ -n "${ENABLE_UHD}" ]; then
           BUILD_ARGS="${BUILD_ARGS} -DENABLE_UHD=${ENABLE_UHD}"
         fi
-        if [ -n "${ENABLE_ZERO_MQ}" ]; then
-          BUILD_ARGS="${BUILD_ARGS} -DENABLE_ZERO_MQ=${ENABLE_ZERO_MQ}"
+        if [ -n "${ENABLE_ZEROMQ}" ]; then
+          BUILD_ARGS="${BUILD_ARGS} -DENABLE_ZEROMQ=${ENABLE_ZEROMQ}"
         fi
         if [ -n "${ENABLE_ASAN}" ]; then
           BUILD_ARGS="${BUILD_ARGS} -DENABLE_ASAN=${ENABLE_ASAN}"
@@ -105,6 +105,7 @@ stages:
         echo "${BUILD_CMD}"
         echo "============================================================================================="
         $BUILD_CMD
+        cd build && ninja install && cd ..
       }
     - |
       launch_tests() {
@@ -186,16 +187,10 @@ stages:
       - ccache
     policy: pull
 
-.build_and_unit_big:
-  extends: .build_and_unit
-  variables:
-    KUBERNETES_CPU_REQUEST: 7
-    KUBERNETES_MEMORY_REQUEST: 13Gi
-
 # Main combinations
 
 .build_and_unit_main:
-  extends: .build_and_unit_big
+  extends: .build_and_unit
   variables:
     ASSERT_LEVEL: PARANOID
   parallel:
@@ -214,7 +209,7 @@ stages:
         COMPILER: gcc
         BUILD_TYPE: Release
         ENABLE_EXPORT: "True"
-      - OS: rhel8
+      - OS: rhel-8
         TEST_MODE: default
         COMPILER: gcc
         BUILD_TYPE: Release
@@ -246,6 +241,20 @@ build clean:
   cache: []
 
 # Alt combinations
+
+build without rf:
+  extends: .build_and_unit
+  rules:
+    - if: $CI_DESCRIPTION =~ /Nightly/
+  variables:
+    BUILD_TYPE: "" # Default one
+    TEST_MODE: default
+    ENABLE_ZEROMQ: "False"
+    ENABLE_UHD: "False"
+  parallel:
+    matrix:
+      - OS: [ubuntu-22.04, ubuntu-20.04]
+        COMPILER: [gcc, clang]
 
 .build_and_unit_alt:
   extends: .build_and_unit
@@ -413,33 +422,63 @@ build alt [archlinux-latest, amd64, RelWithDebInfo]:
     BUILD_TYPE: RelWithDebInfo
   cache: []
 
-build alt [rhel8, amd64, Debug]:
+build alt [rhel-8, amd64, Debug]:
   extends: .build_and_unit_alt
   rules:
     - if: $CI_DESCRIPTION =~ /Nightly/
   variables:
-    OS: rhel8
+    OS: rhel-8
     PLATFORM: amd64
     BUILD_TYPE: Debug
   cache: []
 
-build alt [rhel8, amd64, Release]:
+build alt [rhel-8, amd64, Release]:
   extends: .build_and_unit_alt
   rules:
     - if: $CI_DESCRIPTION =~ /Nightly/
   variables:
-    OS: rhel8
+    OS: rhel-8
     PLATFORM: amd64
     BUILD_TYPE: Release
   cache: []
 
-build alt [rhel8, amd64, RelWithDebInfo]:
+build alt [rhel-8, amd64, RelWithDebInfo]:
   extends: .build_and_unit_alt
   rules:
     - if: $CI_DESCRIPTION =~ /Weekly/
   variables:
-    OS: rhel8
+    OS: rhel-8
     PLATFORM: amd64
+    BUILD_TYPE: RelWithDebInfo
+  cache: []
+
+build alt [rhel-8, arm64, Debug]:
+  extends: .build_and_unit_alt
+  rules:
+    - if: $CI_DESCRIPTION =~ /Nightly/
+  variables:
+    OS: rhel-8
+    PLATFORM: arm64
+    BUILD_TYPE: Debug
+  cache: []
+
+build alt [rhel-8, arm64, Release]:
+  extends: .build_and_unit_alt
+  rules:
+    - if: $CI_DESCRIPTION =~ /Nightly/
+  variables:
+    OS: rhel-8
+    PLATFORM: arm64
+    BUILD_TYPE: Release
+  cache: []
+
+build alt [rhel-8, arm64, RelWithDebInfo]:
+  extends: .build_and_unit_alt
+  rules:
+    - if: $CI_DESCRIPTION =~ /Weekly/
+  variables:
+    OS: rhel-8
+    PLATFORM: arm64
     BUILD_TYPE: RelWithDebInfo
   cache: []
 
@@ -563,20 +602,20 @@ avx2 [tsan, clean]:
     - if: $CI_MERGE_REQUEST_LABELS =~ /no-cache/
   cache: []
 
-# avx2 [asan]:
-#   extends: .avx
-#   rules:
-#     - if: $CI_DESCRIPTION =~ /Nightly/
-#   variables:
-#     OS: ubuntu-22.04
-#     TEST_MODE: asan
-#     COMPILER: gcc
-#     BUILD_TYPE: Debug
-#     ENABLE_ASAN: "True"
-#     ASSERT_LEVEL: PARANOID
-#     CPU_FLAG: "avx2"
-#     ENABLE_AVX512: "False"
-#     ENABLE_AVX2: "True"
+avx2 [asan]:
+  extends: .avx
+  rules:
+    - if: $CI_DESCRIPTION =~ /Nightly/
+  variables:
+    OS: ubuntu-22.04
+    TEST_MODE: asan
+    COMPILER: gcc
+    BUILD_TYPE: Debug
+    ENABLE_ASAN: "True"
+    ASSERT_LEVEL: PARANOID
+    CPU_FLAG: "avx2"
+    ENABLE_AVX512: "False"
+    ENABLE_AVX2: "True"
 
 avx512:
   extends: .avx
@@ -598,8 +637,12 @@ avx extended:
     matrix:
       - CPU_FLAG: ["avx2", "avx2-avx512"]
         AUTO_DETECT_ISA: ["True", "False"]
+        ENABLE_AVX2: "True"
         ENABLE_AVX512: ["True", "False"]
-        ENABLE_AVX2: ["True", "False"]
+      - CPU_FLAG: ["avx2", "avx2-avx512"]
+        AUTO_DETECT_ISA: ["True", "False"]
+        ENABLE_AVX2: "False"
+        ENABLE_AVX512: "False"
 
 # Custom
 

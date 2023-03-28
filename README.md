@@ -9,6 +9,8 @@ See the [srsRAN Project](https://www.srsran.com/) for information, guides and pr
 
 For application features, build instructions and user guides see the [srsRAN Project documentation](https://docs.srsran.com/projects/project).
 
+For community announcements and support, join our [discussion board](https://www.github.com/srsran/srsran_project/discussions).
+
 Current Features
 ----------------
 
@@ -27,20 +29,21 @@ License
 
 For license details, see [LICENSE](LICENSE) file.
 
-Build Instructions
-------------------
+Build Preparation
+-----------------
 
-* Mandatory requirements:
+* Build tools:
   * cmake:               <https://cmake.org/>
+  
+* Mandatory requirements:
   * libfftw:             <https://www.fftw.org/>
-  * UHD:                 <https://github.com/EttusResearch/uhd>
   * libsctp:             <https://github.com/sctp/lksctp-tools>
   * yaml-cpp:            <https://github.com/jbeder/yaml-cpp>
   * PolarSSL/mbedTLS:    <https://www.trustedfirmware.org/projects/mbed-tls/>
   * googletest:          <https://github.com/google/googletest/>
-    * You can skip test building by using the cmake option `-DBUILD_TESTS=False`. GoogleTest is not mandatory when building without tests.
+    * You can skip test building by using the cmake option `-DBUILD_TESTS=OFF`. GoogleTest is not mandatory when building without tests.
 
-You can install the required libraries for some example distributions with the commands below:
+You can install the build tools and mandatory requirements for some example distributions with the commands below:
 
 <details open>
 <summary>Ubuntu 22.04</summary>
@@ -67,8 +70,15 @@ sudo pacman -S cmake make base-devel fftw mbedtls yaml-cpp lksctp-tools gtest
 ```
 </details>
 
-* Optional requirements
-  * ZeroMQ:              <https://github.com/zeromq>
+The srsRAN Project uses RF drivers to support different radio types.
+Currently, only UHD is supported however additional drivers are under development:
+
+* RF driver:
+  * UHD:                 <https://github.com/EttusResearch/uhd>
+    * See UHD documentation for installation instructions.
+    
+Build Instructions
+------------------
 
 Download and build srsRAN:
 
@@ -81,3 +91,19 @@ cmake ..
 make
 make test
 ```
+
+Run PHY testvector tests:
+
+A number of PHY tests are based on MATLAB generated testvectors. By default, those tests are disabled.
+The following steps are required to enable them:
+
+1. Download the [PHY testvector set](https://github.com/srsran/srsRAN_Project/releases/download/release_23_3/phy_testvectors.tar.gz).
+2. Copy the PHY testvectors to its location within srsRAN:
+```
+tar -xzf phy_testvectors.tar.gz -C /path_to_your_local_repository/srsgnb/
+```
+3. Enable the use of PHY testvectors by modifying the root [CMakeLists](CMakeLists.txt) as shown below:
+```
+option(USE_PHY_TESTVECTORS   "Enable testvector PHY tests"              ON)
+```
+4. Do a fresh srsRAN build.

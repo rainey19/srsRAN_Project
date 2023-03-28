@@ -195,7 +195,7 @@ find_package(Threads REQUIRED)
 
 # UHD
 if (ENABLE_UHD)
-    find_package(UHD REQUIRED)
+    find_package(UHD)
     if (UHD_FOUND)
         include_directories(${UHD_INCLUDE_DIRS})
         link_directories(${UHD_LIBRARY_DIRS})

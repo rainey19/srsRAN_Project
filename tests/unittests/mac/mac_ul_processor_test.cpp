@@ -58,34 +58,37 @@ public:
   // Compare last_bsr_msg with a test message passed to the function.
   void verify_bsr_msg(const ul_bsr_indication_message& test_usr_msg)
   {
-    EXPECT_EQ(last_bsr_msg.cell_index, test_usr_msg.cell_index);
-    EXPECT_EQ(last_bsr_msg.ue_index, test_usr_msg.ue_index);
-    EXPECT_EQ(last_bsr_msg.crnti, test_usr_msg.crnti);
-    EXPECT_EQ(last_bsr_msg.type, test_usr_msg.type);
-    EXPECT_EQ(last_bsr_msg.reported_lcgs.size(), test_usr_msg.reported_lcgs.size());
+    EXPECT_EQ(last_bsr_msg->cell_index, test_usr_msg.cell_index);
+    EXPECT_EQ(last_bsr_msg->ue_index, test_usr_msg.ue_index);
+    EXPECT_EQ(last_bsr_msg->crnti, test_usr_msg.crnti);
+    EXPECT_EQ(last_bsr_msg->type, test_usr_msg.type);
+    EXPECT_EQ(last_bsr_msg->reported_lcgs.size(), test_usr_msg.reported_lcgs.size());
     for (size_t n = 0; n < test_usr_msg.reported_lcgs.size(); ++n) {
-      EXPECT_EQ(last_bsr_msg.reported_lcgs[n].lcg_id, test_usr_msg.reported_lcgs[n].lcg_id);
-      EXPECT_EQ(last_bsr_msg.reported_lcgs[n].nof_bytes, test_usr_msg.reported_lcgs[n].nof_bytes);
+      EXPECT_EQ(last_bsr_msg->reported_lcgs[n].lcg_id, test_usr_msg.reported_lcgs[n].lcg_id);
+      EXPECT_EQ(last_bsr_msg->reported_lcgs[n].nof_bytes, test_usr_msg.reported_lcgs[n].nof_bytes);
     }
   }
 
-private:
-  ul_bsr_indication_message last_bsr_msg;
-  uci_indication            last_uci_ind;
+  optional<ul_bsr_indication_message> last_bsr_msg;
+  uci_indication                      last_uci_ind;
 };
 
 // Helper struct that creates a MAC UL to test the correct processing of RX indication messages.
 struct test_bench {
   static constexpr unsigned DEFAULT_ACTIVITY_TIMEOUT = 100;
 
-  test_bench(rnti_t rnti, du_ue_index_t du_ue_idx, du_cell_index_t cell_idx_) : cell_idx(cell_idx_)
+  test_bench(du_cell_index_t cell_idx_) : cell_idx(cell_idx_)
   {
-    add_ue(rnti, du_ue_idx);
     rx_msg_sbsr.cell_index = cell_idx;
     rx_msg_sbsr.sl_rx      = slot_point(0, 1);
 
     logger.set_level(srslog::basic_levels::debug);
     srslog::init();
+  }
+
+  test_bench(rnti_t rnti, du_ue_index_t du_ue_idx, du_cell_index_t cell_idx_) : test_bench(cell_idx_)
+  {
+    add_ue(rnti, du_ue_idx);
   }
 
   // Add a UE to the RNTI table.
@@ -98,9 +101,6 @@ struct test_bench {
     test_ues[du_ue_idx].rnti     = rnti;
     test_ues[du_ue_idx].ue_index = du_ue_idx;
     test_ues[du_ue_idx].add_bearer(LCID_SRB1);
-    test_ues[du_ue_idx].activity_timer = timers.create_unique_timer();
-    test_ues[du_ue_idx].activity_timer.set(activity_timeout);
-    test_ues[du_ue_idx].activity_timer.run();
     async_task<bool>         t = mac_ul.add_ue(test_ues[du_ue_idx].make_ue_create_request());
     lazy_task_launcher<bool> launcher(t);
     srsran_assert(t.ready(), "UE addition should have completed");
@@ -152,7 +152,23 @@ struct test_bench {
   void run_slot()
   {
     logger.set_level(srslog::basic_levels::debug);
-    timers.tick_all();
+    timers.tick();
+    task_exec.run_pending_tasks();
+  }
+
+  bool verify_no_bsr_notification(rnti_t rnti) const
+  {
+    return not sched_feedback.last_bsr_msg.has_value() or sched_feedback.last_bsr_msg->crnti != rnti;
+  }
+
+  bool verify_no_sr_notification(rnti_t rnti) const
+  {
+    for (const auto& uci : sched_feedback.last_uci_ind.ucis) {
+      if (uci.crnti == rnti) {
+        return false;
+      }
+    }
+    return true;
   }
 
 private:
@@ -388,49 +404,35 @@ TEST(mac_ul_processor, decode_crnti_ce_and_sbsr)
   ASSERT_NO_FATAL_FAILURE(t_bench.verify_sched_bsr_notification(ul_bsr_ind));
 }
 
-TEST(mac_ul_processor, no_ul_sdus_expires_ue_activity_timer)
+// Test UL MAC processing of RX indication message with MAC PDU for multiple subPDUs (MAC CE C-RNTI, MAC CE Short BSR),
+// when old C-RNTI does not exist.
+TEST(mac_ul_processor, handle_crnti_ce_with_inexistent_old_crnti)
 {
-  du_ue_index_t ue_index = to_du_ue_index(0);
-  test_bench    t_bench(to_rnti(0x4601), ue_index, to_du_cell_index(0));
-  ASSERT_TRUE(t_bench.get_test_ues().contains(ue_index));
+  // Define UE and create test_bench.
+  rnti_t          ue2_rnti = to_rnti(0x4602);
+  du_ue_index_t   ue2_idx  = to_du_ue_index(2U);
+  du_cell_index_t cell_idx = to_du_cell_index(0U);
+  test_bench      t_bench(cell_idx);
+  t_bench.add_ue(ue2_rnti, ue2_idx);
 
-  unsigned timeout = test_bench::DEFAULT_ACTIVITY_TIMEOUT;
-  for (unsigned i = 0; i != timeout; ++i) {
-    ASSERT_TRUE(t_bench.get_test_ues()[ue_index].activity_timer.is_running());
-    ASSERT_FALSE(t_bench.get_test_ues()[ue_index].activity_timer.has_expired());
-    t_bench.run_slot();
-  }
-  ASSERT_FALSE(t_bench.get_test_ues()[ue_index].activity_timer.is_running());
-  ASSERT_TRUE(t_bench.get_test_ues()[ue_index].activity_timer.has_expired());
-}
-
-TEST(mac_ul_processor, ul_sdus_postpone_ue_activity_timeout)
-{
-  du_ue_index_t ue_index = to_du_ue_index(test_rgen::uniform_int<unsigned>(0, MAX_DU_UE_INDEX));
-  test_bench    t_bench(to_rnti(0x4601), ue_index, to_du_cell_index(0));
-  ASSERT_TRUE(t_bench.get_test_ues().contains(ue_index));
-  unsigned timeout = test_bench::DEFAULT_ACTIVITY_TIMEOUT;
-
-  // > Run until before activity timer expiry.
-  unsigned slots_to_run = test_rgen::uniform_int<unsigned>(0, timeout - 1);
-  for (unsigned i = 0; i != slots_to_run; ++i) {
-    t_bench.run_slot();
-  }
-
-  // > Send UL PDU.
-  unsigned    L = test_rgen::uniform_int<unsigned>(1, 64);
-  byte_buffer msg{test_rgen::random_vector<uint8_t>(L)};
-  // R/LCID MAC subheader = R|R|LCID || L = 0|0|1 || L
-  msg.prepend(std::vector<uint8_t>{0x01, static_cast<uint8_t>(L)});
   // Create PDU content.
-  t_bench.send_rx_indication_msg(to_rnti(0x4601), msg);
+  byte_buffer pdu;
+  // > Create subPDU content.
+  // R/LCID MAC subheader | MAC CE C-RNTI
+  // { 0x3a | 0x46, 0x01 }
+  byte_buffer ce_crnti({0x3a, 0x46, 0x01});
+  pdu.append(ce_crnti);
+  // > Create subPDU content.
+  // R/LCID MAC subheader | MAC CE Short BSR
+  // { 0x3d | 0x59}
+  byte_buffer sbsr({0x3d, 0x59});
+  pdu.append(sbsr);
 
-  // > Run until activity timer expiry.
-  for (unsigned i = 0; i != timeout; ++i) {
-    ASSERT_TRUE(t_bench.get_test_ues()[ue_index].activity_timer.is_running());
-    ASSERT_FALSE(t_bench.get_test_ues()[ue_index].activity_timer.has_expired());
-    t_bench.run_slot();
-  }
-  ASSERT_FALSE(t_bench.get_test_ues()[ue_index].activity_timer.is_running());
-  ASSERT_TRUE(t_bench.get_test_ues()[ue_index].activity_timer.has_expired());
+  // Send RX data indication to MAC UL
+  t_bench.send_rx_indication_msg(ue2_rnti, pdu);
+
+  // Ensure Scheduler did not get notified of any BSR.
+  ASSERT_TRUE(t_bench.verify_no_bsr_notification(to_rnti(0x4601)));
+  ASSERT_TRUE(t_bench.verify_no_bsr_notification(ue2_rnti));
+  ASSERT_TRUE(t_bench.verify_no_sr_notification(to_rnti(0x4601)));
 }
