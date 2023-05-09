@@ -563,6 +563,7 @@ void srsran::srs_du::fill_asn1_f1_setup_request(asn1::f1ap::f1_setup_request_s& 
   byte_buffer buf;
   // TODO: Add other inputs and set values accordingly
 
+  request->gnb_du_name_present = true;
   request->gnb_du_id.value = setup_params.gnb_du_id;
   request->gnb_du_name.value.from_string(setup_params.gnb_du_name);
   request->gnb_du_rrc_version.value.latest_rrc_version.from_number(setup_params.rrc_version);
@@ -581,6 +582,61 @@ void srsran::srs_du::fill_asn1_f1_setup_request(asn1::f1ap::f1_setup_request_s& 
     f1ap_cell.served_cell_info.nr_cgi.nr_cell_id.from_number(cell_cfg->nr_cgi.nci);
     f1ap_cell.served_cell_info.five_gs_tac_present = true;
     f1ap_cell.served_cell_info.five_gs_tac.from_number(cell_cfg->tac);
+
+    // Fill Served PLMN.
+    asn1::f1ap::served_plmns_item_s served_plmn;
+    served_plmn.plmn_id.from_string(cell_cfg->nr_cgi.plmn);
+    // BENTODO: fill from config
+    asn1::f1ap::slice_support_item_s slice_support_item;
+    slice_support_item.snssai.sst.from_number(1);
+    served_plmn.ie_exts.tai_slice_support_list_present = true;
+    served_plmn.ie_exts.tai_slice_support_list->push_back(slice_support_item);
+    f1ap_cell.served_cell_info.served_plmns.push_back(served_plmn);
+    
+    // BENTODO: this
+    if (cell_cfg->tdd_ul_dl_cfg_common) {
+      f1ap_cell.served_cell_info.nr_mode_info.set_fdd();
+      f1ap_cell.served_cell_info.nr_mode_info.fdd().dl_nr_freq_info;
+      f1ap_cell.served_cell_info.nr_mode_info.fdd().dl_tx_bw;
+      f1ap_cell.served_cell_info.nr_mode_info.fdd().ul_nr_freq_info;
+      f1ap_cell.served_cell_info.nr_mode_info.fdd().ul_tx_bw;
+    } else {
+      f1ap_cell.served_cell_info.nr_mode_info.set_tdd();
+      f1ap_cell.served_cell_info.nr_mode_info.tdd().nr_freq_info.nr_arfcn = cell_cfg->dl_carrier.arfcn;
+
+      for (std::size_t i=0; i<cell_cfg->dl_cfg_common.freq_info_dl.freq_band_list.size(); i++)
+      {
+        asn1::f1ap::freq_band_nr_item_s freq_band_nr_item;
+        freq_band_nr_item.freq_band_ind_nr = (uint16_t)cell_cfg->dl_cfg_common.freq_info_dl.freq_band_list[i].band;
+        f1ap_cell.served_cell_info.nr_mode_info.tdd().nr_freq_info.freq_band_list_nr.push_back(freq_band_nr_item);
+      }
+
+      asn1::f1ap::nr_scs_opts::options scs;
+      switch (cell_cfg->scs_common)
+      {
+        case srsran::subcarrier_spacing::kHz15:
+          scs = asn1::f1ap::nr_scs_opts::scs15;
+          break;
+        case srsran::subcarrier_spacing::kHz30:
+          scs = asn1::f1ap::nr_scs_opts::scs30;
+          break;
+        case srsran::subcarrier_spacing::kHz60:
+          scs = asn1::f1ap::nr_scs_opts::scs60;
+          break;
+        case srsran::subcarrier_spacing::kHz120:
+          scs = asn1::f1ap::nr_scs_opts::scs120;
+          break;
+        case srsran::subcarrier_spacing::kHz240:
+        case srsran::subcarrier_spacing::invalid:
+        default:
+          printf("Something bad");
+          return;
+      }
+      f1ap_cell.served_cell_info.nr_mode_info.tdd().tx_bw.nr_scs.value = scs;
+
+      f1ap_cell.served_cell_info.nr_mode_info.tdd().tx_bw.nr_nrb.value = asn1::f1ap::nr_nrb_opts::nrb51; // BENTODO: where to get this
+      f1ap_cell.served_cell_info.meas_timing_cfg.from_string("30"); // BENTODO: where to get this
+    }
 
     // Add System Information related to the cell.
     f1ap_cell.gnb_du_sys_info_present = true;

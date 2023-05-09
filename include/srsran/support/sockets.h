@@ -105,6 +105,8 @@ inline bool sctp_set_init_msg_opts(int                   fd,
   if (max_init_timeo.has_value()) {
     init_opts.sinit_max_init_timeo = max_init_timeo.value();
   }
+  init_opts.sinit_max_instreams = 2;
+  init_opts.sinit_num_ostreams = 2;
 
   logger.debug("Setting SCTP_INITMSG options on SCTP socket. Max attempts {}, Max init attempts timeout {}",
                init_opts.sinit_max_attempts,
