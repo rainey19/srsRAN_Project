@@ -22,16 +22,22 @@
 
 #include "../../../lib/du_high/du_high.h"
 #include "../../../lib/du_high/du_high_executor_strategies.h"
+#include "../../gnb/helpers/gnb_console_helper.h"
 #include "fapi_factory.h"
+#include "f1ap_adapter.h"
+#include "lib/pcap/dlt_pcap_impl.h"
 #include "lib/pcap/mac_pcap_impl.h"
+#include "lib/pcap/f1ap_pcap.h"
 #include "phy_factory.h"
 #include "radio_factory.h"
 #include "radio_notifier_sample.h"
 #include "srsran/asn1/rrc_nr/rrc_nr.h"
 #include "srsran/du/du_cell_config_helpers.h"
+#include "srsran/support/io_broker/io_broker_factory.h"
 #include "srsran/fapi/logging_decorator_factories.h"
 #include "srsran/fapi_adaptor/mac/mac_fapi_adaptor_factory.h"
 #include "srsran/fapi_adaptor/phy/phy_fapi_adaptor_factory.h"
+#include "srsran/gateways/sctp_network_gateway.h"
 #include "srsran/phy/adapters/phy_error_adapter.h"
 #include "srsran/phy/adapters/phy_rg_gateway_adapter.h"
 #include "srsran/phy/adapters/phy_rx_symbol_adapter.h"
@@ -80,6 +86,12 @@ static const unsigned max_nof_concurrent_requests = 11;
 
 /// Radio configuration parameters.
 static std::string                               driver_name = "zmq";
+
+static std::string                               cu_address  = "127.0.1.12";
+static int                                       cu_port     = 38472;
+static std::string                               du_address  = "127.0.1.13";
+static int                                       du_port     = 500;
+
 static std::string                               rx_address  = "tcp://localhost:6000";
 static std::string                               tx_address  = "tcp://*:5000";
 static std::string                               device_arguments;
@@ -422,6 +434,12 @@ static void usage(std::string prog)
   fmt::print("\t-z Enable FAPI logs. [Default {}]\n", enable_fapi_logs);
   fmt::print("\t-r ZMQ rx address. [Default {}]\n", rx_address);
   fmt::print("\t-t ZMQ tx address. [Default {}]\n", tx_address);
+
+  fmt::print("\t-y CU address. [Default {}]\n", cu_address);
+  fmt::print("\t-u CU port. [Default {}]\n", cu_port);
+  fmt::print("\t-i F1 bind address. [Default {}]\n", du_address);
+  fmt::print("\t-o F1 bind port. [Default {}]\n", du_port);
+
   fmt::print("\t-h print this message.\n");
 }
 
@@ -430,7 +448,7 @@ static int parse_args(int argc, char** argv)
   std::string profile_name;
 
   int opt = 0;
-  while ((opt = ::getopt(argc, argv, "P:v:b:r:t:czh")) != -1) {
+  while ((opt = ::getopt(argc, argv, "P:v:b:r:t:y:u:i:o:czh")) != -1) {
     switch (opt) {
       case 'P':
         if (optarg != nullptr) {
@@ -460,7 +478,31 @@ static int parse_args(int argc, char** argv)
         if (optarg != nullptr) {
           baseband_gain_dB = std::strtof(optarg, nullptr);
         }
+
+
+
+      case 'y':
+        if (optarg != nullptr) {
+          cu_address = std::string(optarg);
+        }
         break;
+      case 'u':
+        if (optarg != nullptr) {
+          cu_port = std::strtol(optarg, nullptr, 10);
+        }
+        break;
+      case 'i':
+        if (optarg != nullptr) {
+          du_address = std::string(optarg);
+        }
+        break;
+      case 'o':
+        if (optarg != nullptr) {
+          du_port = std::strtol(optarg, nullptr, 10);
+        }
+        break;
+
+
       case 'h':
       default:
         usage(argv[0]);
@@ -700,7 +742,47 @@ int main(int argc, char** argv)
   cell_config.coreset0_index    = coreset0_index;
   cell_config.k_ssb             = K_ssb;
 
-  dummy_cu_cp_handler f1ap_notifier;
+  // Set layer-specific pcap options.
+  f1ap_pcap f1pcap; // BENTODO figure out how to use this?
+  std::unique_ptr<dlt_pcap> f1ap_p = std::make_unique<dlt_pcap_impl>(154, "F1AP"); // F1AP_DLT = 154
+  // f1ap_p->open("du_f1ap.pcap");
+  // if (gnb_cfg.pcap_cfg.f1ap.enabled) {
+  //   f1ap_p->open(gnb_cfg.pcap_cfg.f1ap.filename.c_str());
+  // }
+
+  // Create IO broker.
+  std::unique_ptr<io_broker> epoll_broker = create_io_broker(io_broker_type::epoll);
+
+  // Create console helper object for commands and metrics printing.
+  // gnb_console_helper console(*epoll_broker);
+  // console.on_app_starting();
+
+  // Create F1AP adapter.
+  std::unique_ptr<srsran::f1ap_network_adapter> f1ap_adapter =
+      std::make_unique<srsran::f1ap_network_adapter>("F1AP", *epoll_broker, *f1ap_p);
+
+  // Create SCTP network adapter.
+  srsran::sctp_network_gateway_config f1ap_nw_config;
+  f1ap_nw_config.bind_address = du_address;
+  f1ap_nw_config.bind_port = du_port;
+  f1ap_nw_config.connect_address = cu_address;
+  f1ap_nw_config.connect_port = cu_port;
+  f1ap_nw_config.init_max_attempts = 5;
+
+  du_logger.info("Connecting to CU ({})..", f1ap_nw_config.connect_address, f1ap_nw_config.connect_port);
+  std::unique_ptr<sctp_network_gateway> sctp_gateway =
+      create_sctp_network_gateway({f1ap_nw_config, *f1ap_adapter, *f1ap_adapter});
+  // {
+  //   sctp_network_gateway_config
+  //   sctp_network_gateway_control_notifier
+  //   network_gateway_data_notifier
+  // }
+
+  // Connect F1AP adapter to SCTP network gateway.
+  f1ap_adapter->connect_gateway(sctp_gateway.get(), sctp_gateway.get());
+
+  du_logger.info("CU connection established");
+
   phy_dummy           phy(mac_adaptor->get_cell_result_notifier());
 
   timer_manager             app_timers{256};
@@ -709,7 +791,7 @@ int main(int argc, char** argv)
   du_hi_cfg.du_mng_executor           = &workers.ctrl_exec;
   du_hi_cfg.ue_executors              = &workers.ue_exec_mapper;
   du_hi_cfg.cell_executors            = &workers.cell_exec_mapper;
-  du_hi_cfg.f1ap_notifier             = &f1ap_notifier;
+  du_hi_cfg.f1ap_notifier             = f1ap_adapter.get();
   du_hi_cfg.phy_adapter               = &phy;
   du_hi_cfg.timers                    = &app_timers;
   du_hi_cfg.cells                     = {config_helpers::make_default_du_cell_config(cell_config)};
@@ -723,7 +805,7 @@ int main(int argc, char** argv)
   fill_cell_prach_cfg(cell_cfg);
 
   du_high du_obj(du_hi_cfg);
-  f1ap_notifier.attach_handler(&du_obj.get_f1ap_message_handler());
+  f1ap_adapter->connect_f1ap(&du_obj.get_f1ap_message_handler(), NULL);
   du_logger.info("DU-High created successfully");
 
   // Set signal handler.
