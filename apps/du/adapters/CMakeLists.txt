@@ -17,7 +17,3 @@
 # the LICENSE file in the top-level directory of this distribution
 # and at http://www.gnu.org/licenses/.
 #
-
-add_subdirectory(examples)
-add_subdirectory(gnb)
-add_subdirectory(du)
