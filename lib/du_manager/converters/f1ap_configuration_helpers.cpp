@@ -596,10 +596,47 @@ void srsran::srs_du::fill_asn1_f1_setup_request(asn1::f1ap::f1_setup_request_s& 
     // BENTODO: this
     if (cell_cfg->tdd_ul_dl_cfg_common) {
       f1ap_cell.served_cell_info.nr_mode_info.set_fdd();
-      f1ap_cell.served_cell_info.nr_mode_info.fdd().dl_nr_freq_info;
-      f1ap_cell.served_cell_info.nr_mode_info.fdd().dl_tx_bw;
-      f1ap_cell.served_cell_info.nr_mode_info.fdd().ul_nr_freq_info;
-      f1ap_cell.served_cell_info.nr_mode_info.fdd().ul_tx_bw;
+      f1ap_cell.served_cell_info.nr_mode_info.fdd().dl_nr_freq_info.nr_arfcn = cell_cfg->dl_carrier.arfcn;
+      f1ap_cell.served_cell_info.nr_mode_info.fdd().dl_tx_bw.nr_nrb.value = asn1::f1ap::nr_nrb_opts::nrb51; // BENTODO: where to get this
+      f1ap_cell.served_cell_info.nr_mode_info.fdd().ul_tx_bw.nr_nrb.value = asn1::f1ap::nr_nrb_opts::nrb51; // BENTODO: where to get this
+      f1ap_cell.served_cell_info.meas_timing_cfg.from_string("30"); // BENTODO: where to get this
+
+      for (std::size_t i=0; i<cell_cfg->dl_cfg_common.freq_info_dl.freq_band_list.size(); i++)
+      {
+        asn1::f1ap::freq_band_nr_item_s freq_band_nr_item;
+        freq_band_nr_item.freq_band_ind_nr = (uint16_t)cell_cfg->dl_cfg_common.freq_info_dl.freq_band_list[i].band;
+        f1ap_cell.served_cell_info.nr_mode_info.fdd().dl_nr_freq_info.freq_band_list_nr.push_back(freq_band_nr_item);
+      }
+      for (std::size_t i=0; i<cell_cfg->ul_cfg_common.freq_info_ul.freq_band_list.size(); i++)
+      {
+        asn1::f1ap::freq_band_nr_item_s freq_band_nr_item;
+        freq_band_nr_item.freq_band_ind_nr = (uint16_t)cell_cfg->ul_cfg_common.freq_info_ul.freq_band_list[i].band;
+        f1ap_cell.served_cell_info.nr_mode_info.fdd().ul_nr_freq_info.freq_band_list_nr.push_back(freq_band_nr_item);
+      }
+
+      asn1::f1ap::nr_scs_opts::options scs;
+      switch (cell_cfg->scs_common)
+      {
+        case srsran::subcarrier_spacing::kHz15:
+          scs = asn1::f1ap::nr_scs_opts::scs15;
+          break;
+        case srsran::subcarrier_spacing::kHz30:
+          scs = asn1::f1ap::nr_scs_opts::scs30;
+          break;
+        case srsran::subcarrier_spacing::kHz60:
+          scs = asn1::f1ap::nr_scs_opts::scs60;
+          break;
+        case srsran::subcarrier_spacing::kHz120:
+          scs = asn1::f1ap::nr_scs_opts::scs120;
+          break;
+        case srsran::subcarrier_spacing::kHz240:
+        case srsran::subcarrier_spacing::invalid:
+        default:
+          printf("Something bad");
+          return;
+      }
+      f1ap_cell.served_cell_info.nr_mode_info.fdd().dl_tx_bw.nr_scs = scs;
+      f1ap_cell.served_cell_info.nr_mode_info.fdd().ul_tx_bw.nr_scs = scs;
     } else {
       f1ap_cell.served_cell_info.nr_mode_info.set_tdd();
       f1ap_cell.served_cell_info.nr_mode_info.tdd().nr_freq_info.nr_arfcn = cell_cfg->dl_carrier.arfcn;
