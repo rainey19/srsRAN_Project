@@ -1,0 +1,39 @@
+f1ap:
+  addr: 172.16.250.129                                          # The address or hostname of the CU.
+  bind_addr: 172.16.250.129                                     # A local IP that the DU binds to for traffic from the CU.
+
+rf_driver:
+  device_driver: zmq                                            # The RF driver name.
+  device_args: tx_port=tcp://127.0.0.1:2000,rx_port=tcp://127.0.0.1:2001,base_srate=11.52e6
+  srate: 11.52                                                  # RF sample rate might need to be adjusted according to selected bandwidth.
+  tx_gain: 75                                                   # Transmit gain of the RF might need to adjusted to the given situation.
+  rx_gain: 75                                                   # Receive gain of the RF might need to adjusted to the given situation.
+
+cell_cfg:
+  # dl_arfcn: 632628                                              # ARFCN of the downlink carrier (center frequency).
+  dl_arfcn: 368500
+  # band: 78                                                      # The NR band.
+  band: 3
+  channel_bandwidth_MHz: 10                                     # Bandwith in MHz. Number of PRBs will be automatically derived.
+  # common_scs: 30                                                # Subcarrier spacing in kHz used for data.
+  common_scs: 15
+  plmn: "00101"                                                 # PLMN broadcasted by the DU.
+  tac: 1                                                        # Tracking area code (needs to match the core configuration).
+  pci: 55                                                       # Physical cell ID.
+  pdcch:
+    ss_type: common                 # Search Space type, has to be set to common for SRSUE
+
+log:
+  # filename: /tmp/du.log                                         # Path of the log file.
+  filename: stdout
+  all_level:   debug                                            # Logging level applied to all layers.
+  lib_level:   debug
+  du_level:    debug
+  phy_level:   info
+  radio_level: info
+  mac_level:   info
+  rlc_level:   info
+  f1u_level:   debug
+  sdap_level:  debug
+  gtpu_level:  debug
+  fapi_level:  info
