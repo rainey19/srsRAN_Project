@@ -33,6 +33,7 @@
 namespace srsran {
 
 constexpr uint16_t NGAP_PPID = 60; // NGAP PPID, see TS 38.412, section 7.
+constexpr uint16_t F1AP_PPID = 62; // F1AP PPID, see TS 38.401, section 7.
 
 /// \brief Configuration for SCTP network gateway
 struct sctp_network_gateway_config : common_network_gateway_config {
