@@ -35,6 +35,12 @@ if (ZEROMQ_FOUND AND ENABLE_ZEROMQ)
     list(APPEND SRSGNB_RADIO_LIBRARIES srsran_radio_zmq)
 endif (ZEROMQ_FOUND AND ENABLE_ZEROMQ)
 
+# if (ZEROMQ_FOUND AND ENABLE_ZEROMQ)
+    add_subdirectory(lime)
+    list(APPEND SRSGNB_RADIO_DEFINITIONS -DENABLE_LIME)
+    list(APPEND SRSGNB_RADIO_LIBRARIES srsran_radio_lime)
+# endif (ZEROMQ_FOUND AND ENABLE_ZEROMQ)
+
 add_definitions(${SRSGNB_RADIO_DEFINITIONS})
 target_link_libraries(srsran_radio ${SRSGNB_RADIO_LIBRARIES} srslog)
 
