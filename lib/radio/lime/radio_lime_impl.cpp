@@ -213,7 +213,8 @@ radio_session_lime_impl::radio_session_lime_impl(const radio_configuration::radi
   sampling_rate_hz(radio_config.sampling_rate_hz), async_executor(async_executor_), notifier(notifier_)
 {
   // Set the logging level.
-  // #ifdef LIME_LOG_INFO
+  #ifdef LIME_LOG_INFO
+  // TODO: add logging!
   lime::SDRDevice::LogLevel severity_level = lime::SDRDevice::INFO;
   if (!radio_config.log_level.empty()) {
     std::string log_level = radio_config.log_level;
@@ -234,8 +235,8 @@ radio_session_lime_impl::radio_session_lime_impl(const radio_configuration::radi
       severity_level = lime::SDRDevice::ERROR;
     }
   }
-  // lime::log::set_console_level(severity_level);
-  // #endif
+  lime::log::set_console_level(severity_level);
+  #endif
 
   unsigned total_rx_channel_count = 0;
   for (const radio_configuration::stream& stream_config : radio_config.rx_streams) {

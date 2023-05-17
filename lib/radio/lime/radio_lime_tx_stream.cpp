@@ -84,12 +84,14 @@ bool radio_lime_tx_stream::transmit_block(unsigned&               nof_txd_sample
   // Flatten buffers.
   static_vector<void*, RADIO_MAX_NOF_CHANNELS> buffs_flat_ptr(nof_channels);
   for (unsigned channel = 0; channel != nof_channels; ++channel) {
-    buffs_flat_ptr[channel] = (void*)buffs[channel].subspan(buffer_offset, num_samples).data();
+    buffs_flat_ptr[channel] = (void**)buffs[channel].subspan(buffer_offset, num_samples).data();
   }
 
+  const void** buffer = const_cast<const void **>(buffs_flat_ptr.data());
+
   // Safe transmission.
-  return safe_execution([this, &buffs_flat_ptr, num_samples, &meta, &nof_txd_samples]() {
-    nof_txd_samples = stream->StreamTx(0, buffs_flat_ptr.data(), num_samples, &meta);
+  return safe_execution([this, &buffer, num_samples, &meta, &nof_txd_samples]() {
+    nof_txd_samples = stream->StreamTx(0, buffer, num_samples, &meta);
   });
 }
 
@@ -104,7 +106,7 @@ bool make_arg_pair(std::string arg, std::pair<std::string, std::string>& pair)
   }
   catch (...)
   {
-    printf("Error parsing argument: %s\n", arg);
+    printf("Error parsing argument: %s\n", arg.c_str());
     return false;
   }
 }
@@ -132,9 +134,9 @@ radio_lime_tx_stream::radio_lime_tx_stream(std::shared_ptr<LimeHandle> device,
                                           task_executor&               async_executor_,
                                           radio_notification_handler&  notifier_) :
   stream_id(description.id),
-  stream(device->dev()),
   async_executor(async_executor_),
   notifier(notifier_),
+  stream(device->dev()),
   srate_hz(description.srate_hz),
   nof_channels(description.ports.size())
 {
@@ -167,7 +169,7 @@ radio_lime_tx_stream::radio_lime_tx_stream(std::shared_ptr<LimeHandle> device,
   device->GetStreamConfig().format        = lime::SDRDevice::StreamConfig::F32;
   device->GetStreamConfig().txCount       = nof_channels;
   device->GetStreamConfig().alignPhase    = (nof_channels>1) ? true : false;
-  for (int i=0; i<nof_channels; i++)
+  for (unsigned int i=0; i<nof_channels; i++)
   {
     device->GetStreamConfig().txChannels[i] = i;
     device->GetDeviceConfig().channel[i].tx.enabled = 1;
@@ -185,25 +187,25 @@ radio_lime_tx_stream::radio_lime_tx_stream(std::shared_ptr<LimeHandle> device,
       if (arg.first == "nrbandwidth")
       {
         unsigned long nr_bw = std::stoul(arg.second, nullptr, 10);
-        for (int i=0; i<nof_channels; i++)
+        for (unsigned int i=0; i<nof_channels; i++)
           device->GetDeviceConfig().channel[i].tx.lpf = (nr_bw*1e6) / 2;
       }
       else if (arg.first == "lpf")
       {
         unsigned long lpf = std::stoul(arg.second, nullptr, 10);
-        for (int i=0; i<nof_channels; i++)
+        for (unsigned int i=0; i<nof_channels; i++)
           device->GetDeviceConfig().channel[i].tx.lpf = lpf;
       }
       else if (arg.first == "oversample")
       {
         unsigned long oversample = std::stoul(arg.second, nullptr, 10);
-        for (int i=0; i<nof_channels; i++)
+        for (unsigned int i=0; i<nof_channels; i++)
           device->GetDeviceConfig().channel[i].tx.oversample = oversample;
       }
       else if (arg.first == "gfir")
       {
         unsigned long gfir = std::stoul(arg.second, nullptr, 10);
-        for (int i=0; i<nof_channels; i++)
+        for (unsigned int i=0; i<nof_channels; i++)
         {
           device->GetDeviceConfig().channel[i].tx.gfir.enabled = true;
           device->GetDeviceConfig().channel[i].tx.gfir.bandwidth = gfir;
@@ -211,7 +213,7 @@ radio_lime_tx_stream::radio_lime_tx_stream(std::shared_ptr<LimeHandle> device,
       }
       else if (arg.first == "calibrate")
       {
-        for (int i=0; i<nof_channels; i++)
+        for (unsigned int i=0; i<nof_channels; i++)
           device->GetDeviceConfig().channel[i].tx.calibrate = true;
       }
     }

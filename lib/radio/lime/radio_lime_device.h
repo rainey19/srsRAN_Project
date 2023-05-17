@@ -58,7 +58,8 @@ namespace srsran {
 
 static void LogCallback(lime::SDRDevice::LogLevel lvl, const char* msg)
 {
-  srslog::basic_logger logger = srslog::fetch_basic_logger("RF");
+  static srslog::basic_logger& logger = srslog::fetch_basic_logger("RF");
+
   switch (lvl)
   {
     case lime::SDRDevice::LogLevel::CRITICAL:
@@ -122,6 +123,8 @@ public:
 
     // calibrations setup
     // device->dev()->EnableCache(false);
+
+    return true;
   }
 
   // TODO
@@ -205,13 +208,15 @@ public:
     return safe_execution([this, &sync_src, &clock_src]()
     {
       if (clock_src == "external")
-      bool is_xtrx = true;
-      double ref_freq = 10e6;
-      if (is_xtrx)
       {
-        ref_freq = 31.22e6;
+        bool is_xtrx = true;
+        double ref_freq = 10e6;
+        if (is_xtrx)
+        {
+          ref_freq = 31.22e6;
+        }
+        device->dev()->SetClockFreq(lime::SDRDevice::ClockID::CLK_REFERENCE, ref_freq, 0);
       }
-      device->dev()->SetClockFreq(lime::LMS7002M::ClockID::CLK_REFERENCE, ref_freq, 0);
     });
   }
 

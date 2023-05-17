@@ -24,10 +24,10 @@
 
 using namespace srsran;
 
-bool radio_lime_rx_stream::receive_block(unsigned&                  nof_rxd_samples,
-                                        baseband_gateway_buffer&    data,
-                                        unsigned                    offset,
-                                        lime::SDRDevice::StreamMeta md)
+bool radio_lime_rx_stream::receive_block(unsigned&                   nof_rxd_samples,
+                                        baseband_gateway_buffer&     data,
+                                        unsigned                     offset,
+                                        lime::SDRDevice::StreamMeta& md)
 {
   if (starting_timestamp != 0)
   {
@@ -78,7 +78,7 @@ bool make_arg_pair(std::string arg, std::pair<std::string, std::string>& pair)
   }
   catch (...)
   {
-    printf("Error parsing argument: %s\n", arg);
+    printf("Error parsing argument: %s\n", arg.c_str());
     return false;
   }
 }
@@ -101,18 +101,17 @@ bool split_args(std::string args, std::vector<std::pair<std::string, std::string
   return true;
 }
 
-radio_lime_rx_stream::radio_lime_rx_stream(std::shared_ptr<LimeHandle> device,
+radio_lime_rx_stream::radio_lime_rx_stream(std::shared_ptr<LimeHandle> device_,
                                          const stream_description&     description,
                                          radio_notification_handler&   notifier_) :
   id(description.id),
-  stream(device->dev()),
-  device(device),
   srate_Hz(description.srate_Hz),
-  notifier(notifier_)
+  notifier(notifier_),
+  stream(device_->dev()),
+  device(device_),
+  nof_channels(description.ports.size())
 {
   srsran_assert(std::isnormal(srate_Hz) && (srate_Hz > 0.0), "Invalid sampling rate {}.", srate_Hz);
-  
-  size_t nof_channels = description.ports.size();
 
   // int availableRxChannels = LMS_GetNumChannels(stream, lime::Dir::Rx);
   // if (availableRxChannels < nof_channels)
@@ -137,7 +136,7 @@ radio_lime_rx_stream::radio_lime_rx_stream(std::shared_ptr<LimeHandle> device,
       return;
   }
 
-  for (int i=0; i<nof_channels; i++)
+  for (unsigned int i=0; i<nof_channels; i++)
   {
     device->GetStreamConfig().rxChannels[i] = i;
     device->GetDeviceConfig().channel[i].rx.enabled = 1;
@@ -155,25 +154,25 @@ radio_lime_rx_stream::radio_lime_rx_stream(std::shared_ptr<LimeHandle> device,
       if (arg.first == "nrbandwidth")
       {
         unsigned long nr_bw = std::stoul(arg.second, nullptr, 10);
-        for (int i=0; i<nof_channels; i++)
+        for (unsigned int i=0; i<nof_channels; i++)
           device->GetDeviceConfig().channel[i].rx.lpf = (nr_bw*1e6) / 2;
       }
       else if (arg.first == "lpf")
       {
         unsigned long lpf = std::stoul(arg.second, nullptr, 10);
-        for (int i=0; i<nof_channels; i++)
+        for (unsigned int i=0; i<nof_channels; i++)
           device->GetDeviceConfig().channel[i].rx.lpf = lpf;
       }
       else if (arg.first == "oversample")
       {
         unsigned long oversample = std::stoul(arg.second, nullptr, 10);
-        for (int i=0; i<nof_channels; i++)
+        for (unsigned int i=0; i<nof_channels; i++)
           device->GetDeviceConfig().channel[i].rx.oversample = oversample;
       }
       else if (arg.first == "gfir")
       {
         unsigned long gfir = std::stoul(arg.second, nullptr, 10);
-        for (int i=0; i<nof_channels; i++)
+        for (unsigned int i=0; i<nof_channels; i++)
         {
           device->GetDeviceConfig().channel[i].rx.gfir.enabled = true;
           device->GetDeviceConfig().channel[i].rx.gfir.bandwidth = gfir;
@@ -181,7 +180,7 @@ radio_lime_rx_stream::radio_lime_rx_stream(std::shared_ptr<LimeHandle> device,
       }
       else if (arg.first == "calibrate")
       {
-        for (int i=0; i<nof_channels; i++)
+        for (unsigned int i=0; i<nof_channels; i++)
           device->GetDeviceConfig().channel[i].rx.calibrate = true;
       }
     }
@@ -222,7 +221,7 @@ baseband_gateway_receiver::metadata radio_lime_rx_stream::receive(baseband_gatew
   lime::SDRDevice::StreamMeta         md;
   unsigned                            nsamples            = buffs[0].size();
   unsigned                            rxd_samples_total   = 0;
-  unsigned                            timeout_trial_count = 0;
+  // unsigned                            timeout_trial_count = 0;
 
   // Receive stream in multiple blocks.
   while (rxd_samples_total < nsamples) {

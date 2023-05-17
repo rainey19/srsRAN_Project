@@ -56,12 +56,6 @@ public:
     // Try to execute task and catch exception.
     try {
       task();
-    } catch (const lime::exception& e) {
-      error_message = e.what();
-      return false;
-    } catch (const boost::exception& e) {
-      error_message = boost::diagnostic_information(e);
-      return false;
     } catch (const std::exception& e) {
       error_message = e.what();
       return false;

@@ -68,10 +68,10 @@ private:
   /// \param[in] buffer_offset Indicates the data offset in the reception buffers.
   /// \param[in] metadata Provides the reception metadata.
   /// \return True if no exception is caught. Otherwise false.
-  bool receive_block(unsigned&                  nof_rxd_samples,
-                    baseband_gateway_buffer&    data,
-                    unsigned                    offset,
-                    lime::SDRDevice::StreamMeta md);
+  bool receive_block(unsigned&                   nof_rxd_samples,
+                    baseband_gateway_buffer&     data,
+                    unsigned                     offset,
+                    lime::SDRDevice::StreamMeta& md);
 
 public:
   /// Describes the necessary parameters to create an LIME transmit stream.
