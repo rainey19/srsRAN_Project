@@ -114,6 +114,14 @@ static const std::vector<configuration_profile> profiles = {
        srate            = sampling_rate::from_MHz(11.52);
        bw_rb            = 52;
      }},
+    {"lime",
+     "XTRX radio with 10MHz bandwidth.",
+     []() {
+       driver_name      = "lime";
+       device_arguments = "";
+       srate            = sampling_rate::from_MHz(11.52);
+       bw_rb            = 52;
+     }},
     {"b200_20MHz",
      "Single channel B200 USRP 20MHz bandwidth.",
      []() {
