@@ -34,6 +34,8 @@ public:
 	// xtrx_run_params_t dev_params;
 	static std::shared_ptr<LimeHandle> get(lime::DeviceHandle& devHandle);
 
+	static bool split_args(std::string args, std::vector<std::pair<std::string, std::string>>& arg_list);
+
 protected:
 	lime::SDRDevice* _dev = NULL;
 	lime::SDRDevice::SDRConfig _dev_config;

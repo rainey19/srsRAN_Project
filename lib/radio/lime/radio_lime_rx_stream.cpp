@@ -67,40 +67,6 @@ bool radio_lime_rx_stream::receive_block(unsigned&                   nof_rxd_sam
   });
 }
 
-bool make_arg_pair(std::string arg, std::pair<std::string, std::string>& pair)
-{
-  try
-  {
-    size_t x    = arg.find("=");
-    pair.first  = arg.substr(0, x);
-    pair.second = arg.substr(x);
-    return 1;
-  }
-  catch (...)
-  {
-    printf("Error parsing argument: %s\n", arg.c_str());
-    return false;
-  }
-}
-
-bool split_args(std::string args, std::vector<std::pair<std::string, std::string>>& arg_list)
-{
-  std::string _store_str;
-  std::stringstream _stringstream(args);
-
-  while (getline(_stringstream, _store_str, ','))
-  {
-    std::pair<std::string, std::string> pair;
-    if (!make_arg_pair(_store_str, pair))
-    {
-      printf("Could not parse radio args!\n");
-      return false;
-    }
-    arg_list.push_back(pair);
-  }
-  return true;
-}
-
 radio_lime_rx_stream::radio_lime_rx_stream(std::shared_ptr<LimeHandle> device_,
                                          const stream_description&     description,
                                          radio_notification_handler&   notifier_) :
@@ -147,7 +113,11 @@ radio_lime_rx_stream::radio_lime_rx_stream(std::shared_ptr<LimeHandle> device_,
   if (!description.args.empty())
   {
     std::vector<std::pair<std::string, std::string>> args;
-    split_args(description.args, args);
+    if (!device->split_args(description.args, args))
+    {
+      printf("Error:  failed to create receive stream %d. Could not parse args!\n", id);
+      return;
+    }
 
     for (auto& arg : args)
     {
