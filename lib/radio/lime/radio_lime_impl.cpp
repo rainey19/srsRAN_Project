@@ -176,33 +176,41 @@ bool radio_session_lime_impl::set_rx_freq(unsigned port_idx, radio_configuration
 
 bool radio_session_lime_impl::start_rx_stream()
 {
+  printf("\nSTART 1\n");
   // Prevent multiple threads from starting streams simultaneously.
   std::unique_lock<std::mutex> lock(stream_start_mutex);
+  printf("\nSTART 2\n");
 
   if (!stream_start_required) {
     return true;
   }
+  printf("\nSTART 3\n");
 
   // Flag stream start is no longer required.
   stream_start_required = false;
+  printf("\nSTART 4\n");
 
   // Immediate start of the stream.
   uint64_t time_spec = 0;
+  printf("\nSTART 5\n");
 
   // Get current USRP time as timestamp.
   if (!device.get_time_now(time_spec)) {
     fmt::print("Error: getting time to start stream. {}.\n", device.get_error_message());
     return false;
   }
+  printf("\nSTART 6\n");
   // Add delay to current time.
   time_spec += START_STREAM_DELAY_S;
 
+  printf("\nSTART 7\n");
   // Issue all streams to start.
   for (auto& stream : rx_streams) {
     if (!stream->start(time_spec)) {
       return false;
     }
   }
+  printf("\nSTART 8\n");
 
   return true;
 }
@@ -455,6 +463,7 @@ void radio_session_lime_impl::stop()
 
 void radio_session_lime_impl::start()
 {
+  printf("\nSTARTING THING\n");
   if (!start_rx_stream()) {
     fmt::print("Failed to start Rx streams.\n");
   }

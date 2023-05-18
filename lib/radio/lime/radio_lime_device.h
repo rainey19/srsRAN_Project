@@ -58,26 +58,29 @@ namespace srsran {
 
 static void LogCallback(lime::SDRDevice::LogLevel lvl, const char* msg)
 {
-  static srslog::basic_logger& logger = srslog::fetch_basic_logger("RF");
+  printf("LIMELOG: %s", msg);
+  return;
 
-  switch (lvl)
-  {
-    case lime::SDRDevice::LogLevel::CRITICAL:
-    case lime::SDRDevice::LogLevel::ERROR:
-      logger.error(msg);
-      break;
-    case lime::SDRDevice::LogLevel::WARNING:
-      logger.warning(msg);
-      break;
-    case lime::SDRDevice::LogLevel::INFO:
-      logger.info(msg);
-      break;
-    case lime::SDRDevice::LogLevel::VERBOSE:
-    case lime::SDRDevice::LogLevel::DEBUG:
-    default:
-      logger.debug(msg);
-      break;
-  }
+  // static srslog::basic_logger& logger = srslog::fetch_basic_logger("RF");
+
+  // switch (lvl)
+  // {
+  //   case lime::SDRDevice::LogLevel::CRITICAL:
+  //   case lime::SDRDevice::LogLevel::ERROR:
+  //     logger.error(msg);
+  //     break;
+  //   case lime::SDRDevice::LogLevel::WARNING:
+  //     logger.warning(msg);
+  //     break;
+  //   case lime::SDRDevice::LogLevel::INFO:
+  //     logger.info(msg);
+  //     break;
+  //   case lime::SDRDevice::LogLevel::VERBOSE:
+  //   case lime::SDRDevice::LogLevel::DEBUG:
+  //   default:
+  //     logger.debug(msg);
+  //     break;
+  // }
 }
 
 class radio_lime_device : public lime_exception_handler
@@ -119,7 +122,9 @@ public:
 
     // Initialize devices to default settings
     device->dev()->SetMessageLogCallback(LogCallback);
+    printf("\nSETUP DONE, CALLING INIT\n");
     device->dev()->Init();
+    printf("\nINIT FINALLY RETURNED\n");
 
     // calibrations setup
     // device->dev()->EnableCache(false);
