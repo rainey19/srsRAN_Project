@@ -61,6 +61,7 @@ option(ENABLE_ASAN           "Enable clang address sanitizer"           OFF)
 option(ENABLE_GCOV           "Enable code coverage"                     OFF)
 option(ENABLE_UHD            "Enable UHD"                               ON)
 option(ENABLE_ZEROMQ         "Enable ZeroMQ"                            OFF)
+option(ENABLE_LIME           "Enable Lime"                              ON)
 option(ENABLE_FFTW           "Enable FFTW"                              ON)
 option(ENABLE_DPDK           "Enable DPDK"                              OFF)
 option(ENABLE_EXPORT         "Enable PIC and export libraries"          OFF)
@@ -273,6 +274,17 @@ if (ENABLE_DPDK)
 else (ENABLE_DPDK)
     unset(DPDK_FOUND CACHE)
 endif (ENABLE_DPDK)
+
+# Limesuite
+if (ENABLE_LIME)
+   find_package(LimeSuite2)
+   if (LIME_FOUND)
+       include_directories(${LimeSuite2_INCLUDE_DIRS})
+       link_directories(${LimeSuite2_LIBRARY_DIRS})
+   endif (LIME_FOUND)
+else (ENABLE_LIME)
+   unset (LIME_FOUND CACHE)
+endif (ENABLE_LIME)
 
 ########################################################################
 # Instruction Set Architecture setup

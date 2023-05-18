@@ -30,6 +30,10 @@
 #include "zmq/radio_factory_zmq_impl.h"
 #endif // ENABLE_ZMQ
 
+#ifdef ENABLE_LIME
+#include "lime/radio_lime_impl.h"
+#endif
+
 using namespace srsran;
 
 namespace {
@@ -48,6 +52,9 @@ static const std::vector<radio_factory_entry> radio_factory_available_factories 
 #ifdef ENABLE_ZMQ
     {"zmq", []() { return std::make_unique<radio_factory_zmq_impl>(); }},
 #endif // ENABLE_ZMQ
+#ifdef ENABLE_LIME
+    {"lime", []() {return std::make_unique<radio_factory_lime_impl>(); }},
+#endif
 };
 
 void srsran::print_available_radio_factories()

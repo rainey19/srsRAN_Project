@@ -26,6 +26,6 @@ set(SOURCES_LIME
         radio_lime_tx_stream.cpp)
 add_library(srsran_radio_lime STATIC ${SOURCES_LIME})
 
-target_link_libraries(srsran_radio_lime ${LIME_LIBRARIES})
+target_link_libraries(srsran_radio_lime ${LimeSuite2_LIBRARIES})
 
 install(TARGETS srsran_radio_lime EXPORT srsran_export)
