@@ -60,7 +60,7 @@ private:
   /// Indicates the number of channels.
   unsigned nof_channels;
   /// Indicates the current internal state.
-  radio_uhd_tx_stream_fsm state_fsm;
+  radio_lime_tx_stream_fsm state_fsm;
 
   /// Receive asynchronous message.
   void recv_async_msg(bool isTx, const lime::SDRDevice::StreamStats *s, void* userData);

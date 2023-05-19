@@ -38,7 +38,7 @@
 
 namespace srsran {
 
-class radio_uhd_tx_stream_fsm
+class radio_lime_tx_stream_fsm
 {
 private:
   /// Wait for end-of-burst acknowledgement timeout in seconds.
