@@ -87,7 +87,7 @@ bool radio_lime_tx_stream::transmit_block(unsigned&               nof_txd_sample
     buffs_flat_ptr[channel] = (void**)buffs[channel].subspan(buffer_offset, num_samples).data();
   }
 
-  const void** buffer = const_cast<const void **>(buffs_flat_ptr.data());
+  const lime::complex16_t** buffer = const_cast<const lime::complex16_t **>((lime::complex16_t**)buffs_flat_ptr.data());
 
   // Safe transmission.
   return safe_execution([this, &buffer, num_samples, &meta, &nof_txd_samples]() {
@@ -111,7 +111,7 @@ radio_lime_tx_stream::radio_lime_tx_stream(std::shared_ptr<LimeHandle> device,
   // int availableTxChannels = LMS_GetNumChannels(stream, lime::Dir::Tx);
   // if (availableTxChannels < nof_channels)
   // {
-  //   printf("Error: device supports only %i Tx channels, required %i\n", availableTxChannels, nof_channels);
+  //   fprintf(stderr, "Error: device supports only %i Tx channels, required %i\n", availableTxChannels, nof_channels);
   //   return;
   // }
 
@@ -127,7 +127,7 @@ radio_lime_tx_stream::radio_lime_tx_stream(std::shared_ptr<LimeHandle> device,
       break;
     case radio_configuration::over_the_wire_format::SC8:
     default:
-      printf("Error:  failed to create transmit stream %d. invalid OTW format!\n", stream_id);
+      fprintf(stderr, "Error:  failed to create transmit stream %d. invalid OTW format!\n", stream_id);
       return;
   }
 
@@ -138,8 +138,15 @@ radio_lime_tx_stream::radio_lime_tx_stream(std::shared_ptr<LimeHandle> device,
   for (unsigned int i=0; i<nof_channels; i++)
   {
     device->GetStreamConfig().txChannels[i] = i;
-    device->GetDeviceConfig().channel[i].tx.enabled = 1;
+    device->GetDeviceConfig().channel[i].tx.enabled = true;
     device->GetDeviceConfig().channel[i].tx.sampleRate = srate_hz;
+
+    // TODO: just for testing, remove!
+    device->GetDeviceConfig().channel[i].tx.oversample = 2;
+    device->GetDeviceConfig().channel[i].tx.lpf = 0;//5e6;
+    device->GetDeviceConfig().channel[i].tx.path = 1; // 0=LMS_PATH_NONE, 1=LMS_PATH_TX1, 2=LMS_PATH_TX2
+    device->GetDeviceConfig().channel[i].tx.calibrate = false;
+    device->GetDeviceConfig().channel[i].tx.testSignal = false;
   }
 
   // Parse out optional arguments.
@@ -148,7 +155,7 @@ radio_lime_tx_stream::radio_lime_tx_stream(std::shared_ptr<LimeHandle> device,
     std::vector<std::pair<std::string, std::string>> args;
     if (!device->split_args(description.args, args))
     {
-      printf("Error:  failed to create transmit stream %d. Could not parse args!\n", stream_id);
+      fprintf(stderr, "Error:  failed to create transmit stream %d. Could not parse args!\n", stream_id);
       return;
     }
 
@@ -215,7 +222,7 @@ void radio_lime_tx_stream::transmit(baseband_gateway_buffer& data, const baseban
   while (txd_samples_total < nsamples) {
     unsigned txd_samples = 0;
     if (!transmit_block(txd_samples, data, txd_samples_total, time_spec)) {
-      printf("Error: failed transmitting packet. %s.\n", get_error_message().c_str());
+      fprintf(stderr, "Error: failed transmitting packet. %s.\n", get_error_message().c_str());
       return;
     }
 

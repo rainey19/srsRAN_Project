@@ -49,7 +49,7 @@ static bool radio_lime_device_validate_gain_range(const lime::Range& range, doub
   return (clipped_gain == uint_gain);
 }
 
-static double to_MHz(double value_Hz)
+static double toMHz(double value_Hz)
 {
   return value_Hz * 1e-6;
 }
@@ -58,29 +58,26 @@ namespace srsran {
 
 static void LogCallback(lime::SDRDevice::LogLevel lvl, const char* msg)
 {
-  printf("LIMELOG: %s", msg);
-  return;
+  static srslog::basic_logger& logger = srslog::fetch_basic_logger("RF");
 
-  // static srslog::basic_logger& logger = srslog::fetch_basic_logger("RF");
-
-  // switch (lvl)
-  // {
-  //   case lime::SDRDevice::LogLevel::CRITICAL:
-  //   case lime::SDRDevice::LogLevel::ERROR:
-  //     logger.error(msg);
-  //     break;
-  //   case lime::SDRDevice::LogLevel::WARNING:
-  //     logger.warning(msg);
-  //     break;
-  //   case lime::SDRDevice::LogLevel::INFO:
-  //     logger.info(msg);
-  //     break;
-  //   case lime::SDRDevice::LogLevel::VERBOSE:
-  //   case lime::SDRDevice::LogLevel::DEBUG:
-  //   default:
-  //     logger.debug(msg);
-  //     break;
-  // }
+  switch (lvl)
+  {
+    case lime::SDRDevice::LogLevel::CRITICAL:
+    case lime::SDRDevice::LogLevel::ERROR:
+      logger.error(msg);
+      break;
+    case lime::SDRDevice::LogLevel::WARNING:
+      logger.warning(msg);
+      break;
+    case lime::SDRDevice::LogLevel::INFO:
+      logger.info(msg);
+      break;
+    case lime::SDRDevice::LogLevel::VERBOSE:
+    case lime::SDRDevice::LogLevel::DEBUG:
+    default:
+      logger.debug(msg);
+      break;
+  }
 }
 
 class radio_lime_device : public lime_exception_handler
@@ -99,6 +96,7 @@ public:
     std::vector<lime::DeviceHandle> devHandles = lime::DeviceRegistry::enumerate();
     if (devHandles.size() == 0)
     {
+      logger.error("No LMS7002M boards found!\n");
       fprintf(stderr, "No LMS7002M boards found!\n");
       return false;
     }
@@ -122,9 +120,7 @@ public:
 
     // Initialize devices to default settings
     device->dev()->SetMessageLogCallback(LogCallback);
-    printf("\nSETUP DONE, CALLING INIT\n");
     device->dev()->Init();
-    printf("\nINIT FINALLY RETURNED\n");
 
     // calibrations setup
     // device->dev()->EnableCache(false);
@@ -170,6 +166,8 @@ public:
 
   bool get_time_now(uint64_t& timespec)
   {
+    // timespec = 0;
+    // return true;
     return safe_execution([this, &timespec]()
     {
       lime::SDRDevice::StreamStats rx, tx;
@@ -227,7 +225,7 @@ public:
 
   bool set_rx_rate(double rate)
   {
-    logger.debug("Setting Rx Rate to {} MHz.", to_MHz(rate));
+    logger.debug("Setting Rx Rate to {} MSPS.", toMHz(rate));
 
     return safe_execution([this, rate]() {
       lime::Range range(0, 120e6, 1);
@@ -236,7 +234,7 @@ public:
       // LMS_GetSampleRateRange(device->dev(), false, &range);
 
       if (!radio_lime_device_validate_freq_range(range, rate)) {
-        on_error("Rx Rate {} MHz is invalid. The nearest valid value is {}.", to_MHz(rate), to_MHz(clip(rate, range)));
+        on_error("Rx Rate {} MHz is invalid. The nearest valid value is {}.", toMHz(rate), toMHz(clip(rate, range)));
         return;
       }
 
@@ -253,7 +251,7 @@ public:
 
   bool set_tx_rate(double rate)
   {
-    logger.debug("Setting Tx Rate to {} MHz.", to_MHz(rate));
+    logger.debug("Setting Tx Rate to {} MSPS.", toMHz(rate));
 
     return safe_execution([this, rate]() {
       lime::Range range(0, 120e6, 1);
@@ -262,7 +260,7 @@ public:
       // LMS_GetSampleRateRange(device->dev(), true, &range);
 
       if (!radio_lime_device_validate_freq_range(range, rate)) {
-        on_error("Tx Rate {} MHz is invalid. The nearest valid value is {}.", to_MHz(rate), to_MHz(clip(rate, range)));
+        on_error("Tx Rate {} MHz is invalid. The nearest valid value is {}.", toMHz(rate), toMHz(clip(rate, range)));
         return;
       }
 
@@ -303,7 +301,7 @@ public:
       return stream;
     }
 
-    printf("Error: failed to create receive stream %d. %s.", description.id, stream->get_error_message().c_str());
+    logger.error("Failed to create receive stream {}. {}.", description.id, stream->get_error_message().c_str());
     return nullptr;
   }
 
@@ -357,7 +355,7 @@ public:
 
   bool set_tx_freq(uint32_t ch, const radio_configuration::lo_frequency& config)
   {
-    logger.debug("Setting channel {} Tx frequency to {} MHz.", ch, to_MHz(config.center_frequency_hz));
+    logger.debug("Setting channel {} Tx frequency to {} MHz.", ch, toMHz(config.center_frequency_hz));
 
     return safe_execution([this, ch, &config]() {
       lime::Range range(0, 3.7e9, 1);
@@ -367,9 +365,9 @@ public:
 
       if (!radio_lime_device_validate_freq_range(range, config.center_frequency_hz)) {
         on_error("Tx RF frequency {} MHz is out-of-range. Range is {} - {}.",
-                 to_MHz(config.center_frequency_hz),
-                 to_MHz(range.min),
-                 to_MHz(range.max));
+                 toMHz(config.center_frequency_hz),
+                 toMHz(range.min),
+                 toMHz(range.max));
         return;
       }
 
@@ -380,7 +378,7 @@ public:
 
   bool set_rx_freq(uint32_t ch, const radio_configuration::lo_frequency& config)
   {
-    logger.debug("Setting channel {} Rx frequency to {} MHz.", ch, to_MHz(config.center_frequency_hz));
+    logger.debug("Setting channel {} Rx frequency to {} MHz.", ch, toMHz(config.center_frequency_hz));
 
     return safe_execution([this, ch, &config]() {
       lime::Range range(0, 3.7e9, 1);
@@ -390,9 +388,9 @@ public:
 
       if (!radio_lime_device_validate_freq_range(range, config.center_frequency_hz)) {
         on_error("Rx RF frequency {} MHz is out-of-range. Range is {} - {}.",
-                 to_MHz(config.center_frequency_hz),
-                 to_MHz(range.min),
-                 to_MHz(range.max));
+                 toMHz(config.center_frequency_hz),
+                 toMHz(range.min),
+                 toMHz(range.max));
         return;
       }
 

@@ -63,7 +63,7 @@ bool radio_lime_rx_stream::receive_block(unsigned&                   nof_rxd_sam
   }
 
   return safe_execution([this, buffs_flat_ptr, num_samples, &md, &nof_rxd_samples]() {
-    nof_rxd_samples = stream->StreamRx(0, (void**)buffs_flat_ptr.data(), num_samples, &md);
+    nof_rxd_samples = stream->StreamRx(0, (lime::complex16_t**)buffs_flat_ptr.data(), num_samples, &md);
   });
 }
 
@@ -82,7 +82,7 @@ radio_lime_rx_stream::radio_lime_rx_stream(std::shared_ptr<LimeHandle> device_,
   // int availableRxChannels = LMS_GetNumChannels(stream, lime::Dir::Rx);
   // if (availableRxChannels < nof_channels)
   // {
-  //   printf("Error: device supports only %i Rx channels, required %i\n", availableRxChannels, nof_channels);
+  //   fprintf(stderr, "Error: device supports only %i Rx channels, required %i\n", availableRxChannels, nof_channels);
   //   return;
   // }
 
@@ -98,15 +98,25 @@ radio_lime_rx_stream::radio_lime_rx_stream(std::shared_ptr<LimeHandle> device_,
       break;
     case radio_configuration::over_the_wire_format::SC8:
     default:
-      printf("Error:  failed to create receive stream %d. invalid OTW format!\n", id);
+      fprintf(stderr, "Error:  failed to create receive stream %d. invalid OTW format!\n", id);
       return;
   }
 
+  device->GetStreamConfig().rxCount = nof_channels;
   for (unsigned int i=0; i<nof_channels; i++)
   {
     device->GetStreamConfig().rxChannels[i] = i;
-    device->GetDeviceConfig().channel[i].rx.enabled = 1;
+    device->GetDeviceConfig().channel[i].rx.enabled = true;
     device->GetDeviceConfig().channel[i].rx.sampleRate = srate_Hz;
+
+    // TODO: just for testing, remove!
+    device->GetDeviceConfig().channel[i].rx.oversample = 2;
+    device->GetDeviceConfig().channel[i].rx.lpf = 0;
+    device->GetDeviceConfig().channel[i].rx.gfir.enabled = false;
+    device->GetDeviceConfig().channel[i].rx.gfir.bandwidth = 0;
+    device->GetDeviceConfig().channel[i].rx.path = 1; // 0=PATH_RFE_NONE, 1=PATH_RFE_LNAH, 2=PATH_RFE_LNAL
+    device->GetDeviceConfig().channel[i].rx.calibrate = false;
+    device->GetDeviceConfig().channel[i].rx.testSignal = false;
   }
 
   // Parse out optional arguments.
@@ -115,7 +125,7 @@ radio_lime_rx_stream::radio_lime_rx_stream(std::shared_ptr<LimeHandle> device_,
     std::vector<std::pair<std::string, std::string>> args;
     if (!device->split_args(description.args, args))
     {
-      printf("Error:  failed to create receive stream %d. Could not parse args!\n", id);
+      fprintf(stderr, "Error:  failed to create receive stream %d. Could not parse args!\n", id);
       return;
     }
 
@@ -172,11 +182,12 @@ bool radio_lime_rx_stream::start(const uint64_t time_spec)
   starting_timestamp = time_spec;
 
   if (!safe_execution([this]() {
+        device->GetDeviceConfig().skipDefaults = true; // defaults are already initialized once at the startup
         stream->Configure(device->GetDeviceConfig(), 0);
         stream->StreamSetup(device->GetStreamConfig(), 0);
         stream->StreamStart(0);
       })) {
-    printf("Error: failed to start receive stream %d. %s.", id, get_error_message().c_str());
+    fprintf(stderr, "Error: failed to start receive stream %d. %s.", id, get_error_message().c_str());
   }
 
   // Transition to streaming state.
@@ -197,7 +208,7 @@ baseband_gateway_receiver::metadata radio_lime_rx_stream::receive(baseband_gatew
   while (rxd_samples_total < nsamples) {
     unsigned rxd_samples = 0;
     if (!receive_block(rxd_samples, buffs, rxd_samples_total, md)) {
-      printf("Error: failed receiving packet. %s.\n", get_error_message().c_str());
+      fprintf(stderr, "Error: failed receiving packet. %s.\n", get_error_message().c_str());
       return {};
     }
 
@@ -222,7 +233,7 @@ baseband_gateway_receiver::metadata radio_lime_rx_stream::receive(baseband_gatew
       case lime::rx_metadata_t::ERROR_CODE_TIMEOUT:
         ++timeout_trial_count;
         if (timeout_trial_count >= 10) {
-          printf("Error: exceeded maximum number of timed out transmissions.\n");
+          fprintf(stderr, "Error: exceeded maximum number of timed out transmissions.\n");
           return ret;
         }
         break;
@@ -238,7 +249,7 @@ baseband_gateway_receiver::metadata radio_lime_rx_stream::receive(baseband_gatew
       case lime::rx_metadata_t::ERROR_CODE_BROKEN_CHAIN:
       case lime::rx_metadata_t::ERROR_CODE_ALIGNMENT:
       case lime::rx_metadata_t::ERROR_CODE_BAD_PACKET:
-        printf("Error: unhandled error in Rx metadata %s.", md.strerror().c_str());
+        fprintf(stderr, "Error: unhandled error in Rx metadata %s.", md.strerror().c_str());
         return ret;
     }
 

@@ -1,6 +1,6 @@
 amf:
-  addr: 192.168.0.154
-  bind_addr: 192.168.0.71
+  addr: 192.168.0.206
+  bind_addr: 192.168.0.116
 
 rf_driver:
   device_driver: lime
@@ -8,7 +8,7 @@ rf_driver:
   clock:
   sync:
   srate: 23.04
-  otw_format: sc12
+  otw_format: sc16
   tx_gain: 50
   rx_gain: 60
 
