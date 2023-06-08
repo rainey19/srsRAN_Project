@@ -18,6 +18,6 @@
 # and at http://www.gnu.org/licenses/.
 #
 
-add_subdirectory(du)
+# add_subdirectory(du)
 add_subdirectory(phy)
 add_subdirectory(radio)

@@ -89,6 +89,22 @@ static const std::vector<benchmark_configuration_profile> benchmark_profiles = {
        nof_tx_streams          = 2;
        nof_rx_streams          = 2;
      }},
+    {"lime",
+     "lime.",
+     []() {
+       driver_name             = "lime";
+       device_arguments        = "rxpath=LNAH,txpath=BAND1";
+       otw_format              = radio_configuration::over_the_wire_format::SC16;
+       sampling_rate_hz        = 23.04e6;
+       block_size              = 256;
+       nof_channels_per_stream = 1;
+       nof_tx_streams          = 1;
+       nof_rx_streams          = 1;
+       tx_freq                 = 3489.42e6;
+       tx_gain                 = 70.0;
+      //  rx_freq                 = 3489.42e6;
+       rx_gain                 = 60.0;
+     }},
     {"x300_20MHz",
      "Single channel X3x0 USRP 20MHz bandwidth.",
      []() {
@@ -338,6 +354,7 @@ int main(int argc, char** argv)
 
   // Create radio.
   radio = factory->create(config, *async_task_executor, notification_handler);
+  radio->start();
   report_fatal_error_if_not(radio, "Failed to create radio.");
 
   // Set signal handler.

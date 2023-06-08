@@ -19,11 +19,6 @@ public:
 
 	unsigned count() { return devcnt; }
 
-	// static double clip_range(xtrx_direction_t dir, double rate);
-
-	// static xtrx_channel_t xtrx_channel(int ch);
-	// bool get_ll(struct xtrxll_dev** lldev);
-
 	LimeHandle() = delete;
 	LimeHandle(lime::DeviceHandle& devHandle);
 	~LimeHandle();
@@ -31,7 +26,6 @@ public:
 	lime::SDRDevice::SDRConfig& GetDeviceConfig() { return _dev_config; }
 	lime::SDRDevice::StreamConfig& GetStreamConfig() { return _stream_config; }
 
-	// xtrx_run_params_t dev_params;
 	static std::shared_ptr<LimeHandle> get(lime::DeviceHandle& devHandle);
 
 	static bool split_args(std::string args, std::vector<std::pair<std::string, std::string>>& arg_list);

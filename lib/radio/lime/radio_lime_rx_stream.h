@@ -60,7 +60,10 @@ private:
   unsigned nof_channels;
   /// Protects stream from concurrent receive and stop.
   std::mutex stream_mutex;
-  uint64_t starting_timestamp = 0;
+  /// Handle to logger object
+  srslog::basic_logger& logger;
+  /// Index of the RFIC (for SDRs with multiple chipsets such as X3 or X8)
+  uint8_t chipIndex;
 
   /// \brief Receives a single block of baseband samples.
   /// \param[out] nof_rxd_samples Indicate the number of samples received in the block.

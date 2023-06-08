@@ -45,7 +45,7 @@ bool make_arg_pair(std::string arg, std::pair<std::string, std::string>& pair)
 	{
 		size_t x    = arg.find("=");
 		pair.first  = arg.substr(0, x);
-		pair.second = arg.substr(x);
+		pair.second = arg.substr(x+1);
 		return true;
 	}
 	catch (...)

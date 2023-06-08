@@ -18,7 +18,7 @@
 # and at http://www.gnu.org/licenses/.
 #
 
-if (UHD_FOUND)
+if (UHD_FOUND OR LIME_FOUND)
     add_executable(radio_util_sample radio_util_sample.cpp)
     target_link_libraries(radio_util_sample srsran_radio srslog srsran_support)
-endif (UHD_FOUND)
+endif (UHD_FOUND OR LIME_FOUND)

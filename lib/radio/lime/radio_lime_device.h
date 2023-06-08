@@ -29,6 +29,14 @@
 
 #define clip(val,range) std::max(range.min, std::min(range.max, val))
 
+static bool reused_bool;
+#define error_catch(thing, function)                                   \
+reused_bool = function;                                                \
+if (reused_bool) {                                                     \
+  logger.error("Error setting {}! (returned {})", thing, reused_bool); \
+}
+
+
 /// \brief Determines whether a frequency is valid within a range.
 ///
 /// A frequency is considered valid within a range if the range clips the frequency value within 1 Hz error.
@@ -60,7 +68,8 @@ static void LogCallback(lime::SDRDevice::LogLevel lvl, const char* msg)
 {
   static srslog::basic_logger& logger = srslog::fetch_basic_logger("RF");
 
-  switch (lvl)
+  logger.debug(msg);
+  /*switch (lvl)
   {
     case lime::SDRDevice::LogLevel::CRITICAL:
     case lime::SDRDevice::LogLevel::ERROR:
@@ -77,7 +86,7 @@ static void LogCallback(lime::SDRDevice::LogLevel lvl, const char* msg)
     default:
       logger.debug(msg);
       break;
-  }
+  }*/
 }
 
 class radio_lime_device : public lime_exception_handler
@@ -87,7 +96,7 @@ public:
 
   bool is_valid() const { return device != nullptr; }
 
-  bool lime_make(const std::string& device_address)
+  bool lime_make(const std::string& device_args)
   {
     // Destroy any previous USRP instance
     device = nullptr;
@@ -122,15 +131,12 @@ public:
     device->dev()->SetMessageLogCallback(LogCallback);
     device->dev()->Init();
 
-    // calibrations setup
-    // device->dev()->EnableCache(false);
-
     return true;
   }
 
-  // TODO
   bool get_mboard_sensor_names(std::vector<std::string>& sensors)
   {
+    sensors.push_back("temp");
     return true;
   }
 
@@ -140,10 +146,17 @@ public:
     return true;
   }
 
-  // TODO
   bool get_sensor(const std::string& sensor_name, double& sensor_value)
   {
-    return true;
+    if (sensor_name == "temp")
+    {
+      // TODO replace 0 with chipIndex
+      lime::LMS7002M* chip = static_cast<lime::LMS7002M*>(device->dev()->GetInternalChip(0));
+      sensor_value = chip->GetTemperature();
+      return true;
+    }
+
+    return false;
   }
 
   // TODO
@@ -166,14 +179,8 @@ public:
 
   bool get_time_now(uint64_t& timespec)
   {
-    // timespec = 0;
-    // return true;
-    return safe_execution([this, &timespec]()
-    {
-      lime::SDRDevice::StreamStats rx, tx;
-      device->dev()->StreamStatus(0, &rx, &tx);
-      timespec = rx.timestamp;
-    });
+    timespec = 0;
+    return true;
   }
 
   // TODO
@@ -239,13 +246,10 @@ public:
       }
 
       // TODO: not implemented in limesuite yet
-      // size_t oversample = 2;
       // LMS_SetSampleRateDir(device->dev(), false, rate, oversample);
-      lime::SDRDevice::SDRConfig conf;
-      conf.skipDefaults = true;
-      conf.referenceClockFreq = 0;
-      conf.channel[0].rx.sampleRate = rate;
-      conf.channel[1].rx.sampleRate = rate;
+      device->GetDeviceConfig().referenceClockFreq = 0;
+      device->GetDeviceConfig().channel[0].rx.sampleRate = rate;
+      device->GetDeviceConfig().channel[1].rx.sampleRate = rate;
     });
   }
 
@@ -265,11 +269,9 @@ public:
       }
 
       // TODO: not implemented in limesuite yet
-      // size_t oversample = 2;
       // LMS_SetSampleRateDir(device->dev(), false, rate, oversample);
-      lime::SDRDevice::SDRConfig& conf = device->GetDeviceConfig();
-      conf.channel[0].tx.sampleRate = rate;
-      conf.channel[1].tx.sampleRate = rate;
+      device->GetDeviceConfig().channel[1].tx.sampleRate = rate;
+      device->GetDeviceConfig().channel[0].tx.sampleRate = rate;
     });
   }
 
@@ -303,6 +305,57 @@ public:
 
     logger.error("Failed to create receive stream {}. {}.", description.id, stream->get_error_message().c_str());
     return nullptr;
+  }
+
+  void execute_config(std::string dev_args)
+  {
+    logger.debug("Configuring radio...");
+    auto t1 = std::chrono::high_resolution_clock::now();
+
+    device->GetDeviceConfig().skipDefaults = true; // defaults are already initialized once at the startup
+    device->dev()->Configure(device->GetDeviceConfig(), 0);
+
+    /*// Temporary gain setting hack
+    set_gain_hack(dev_args);
+
+    if (device->GetDeviceConfig().channel[0].rx.gain == 69)
+    {
+      logger.debug("Calibration style 1");
+      device->GetDeviceConfig().channel[0].rx.calibrate = true;
+      device->GetDeviceConfig().channel[0].tx.calibrate = true;
+      device->GetDeviceConfig().channel[1].rx.calibrate = true;
+      device->GetDeviceConfig().channel[1].tx.calibrate = true;
+      logger.debug("Attempting calibration");
+      device->dev()->Configure(device->GetDeviceConfig(), 0);
+      logger.debug("Finished");
+    }
+    else if (device->GetDeviceConfig().channel[0].rx.gain == 55)
+    {
+      logger.debug("Calibration style 2");
+      device->GetDeviceConfig().channel[0].rx.calibrate = true;
+      device->GetDeviceConfig().channel[0].tx.calibrate = true;
+      device->GetDeviceConfig().channel[1].rx.calibrate = true;
+      device->GetDeviceConfig().channel[1].tx.calibrate = true;
+      logger.debug("Setting paths to loopback");
+      uint8_t rx_path = device->GetDeviceConfig().channel[0].rx.path;
+      uint8_t tx_path = device->GetDeviceConfig().channel[0].tx.path;
+      logger.debug("Saved old paths (rx={}, tx={})", rx_path, tx_path);
+      device->GetDeviceConfig().channel[0].rx.path = 0;
+      device->GetDeviceConfig().channel[0].tx.path = 0;
+      device->GetDeviceConfig().channel[1].rx.path = 0;
+      device->GetDeviceConfig().channel[1].tx.path = 0;
+      logger.debug("Attempting calibration");
+      device->dev()->Configure(device->GetDeviceConfig(), 0);
+      logger.debug("Finished");
+      device->GetDeviceConfig().channel[0].rx.path = rx_path;
+      device->GetDeviceConfig().channel[0].tx.path = tx_path;
+      device->GetDeviceConfig().channel[1].rx.path = rx_path;
+      device->GetDeviceConfig().channel[1].tx.path = tx_path;
+      logger.debug("Returned paths to previous (rx={}, tx={})", rx_path, tx_path);
+    }*/
+
+    auto t2 = std::chrono::high_resolution_clock::now();
+    logger.debug("Radio configured in {}ms.", std::chrono::duration_cast<std::chrono::milliseconds>(t2-t1).count());
   }
 
   bool set_tx_gain(unsigned ch, double gain)
@@ -402,6 +455,70 @@ public:
 private:
   std::shared_ptr<LimeHandle> device = nullptr;
   srslog::basic_logger&       logger;
+
+  void set_gain_hack(std::string dev_args)
+  {
+    // Parse out optional arguments.
+    if (!dev_args.empty())
+    {
+      std::vector<std::pair<std::string, std::string>> args;
+      device->split_args(dev_args, args);
+
+      // 0-min, 15-max
+      int lna = -1;
+      // 0-min, 31-max
+      int pga = -1;
+      // 0-min, 64-max
+      int iamp = -1;
+      // 0-max, 31-min
+      int txpad = -1;
+
+      logger.debug("Configuring gains...");
+      for (auto& arg : args)
+      {
+        if (arg.first == "lna")
+          lna = std::stoul(arg.second, nullptr, 10);
+        else if (arg.first == "pga")
+          pga = std::stoul(arg.second, nullptr, 10);
+        else if (arg.first == "iamp")
+          iamp = std::stoul(arg.second, nullptr, 10);
+        else if (arg.first == "txpad")
+          txpad = std::stoul(arg.second, nullptr, 10);
+        else
+          continue;
+        logger.debug("Setting {} to {}", arg.first, arg.second);
+      }
+
+      // TODO replace 0 with chipIndex
+      lime::LMS7002M* chip = static_cast<lime::LMS7002M*>(device->dev()->GetInternalChip(0));
+      for(int mac=1; mac<=2; ++mac)
+      {
+        error_catch("LMS7_MAC",
+                    chip->Modify_SPI_Reg_bits(LMS7_MAC, mac));
+        if (lna != -1)
+        {
+          error_catch("LMS7_MAC",
+                    chip->Modify_SPI_Reg_bits(LMS7_G_LNA_RFE, lna));
+        }
+        if (pga != -1)
+        {
+          error_catch("LMS7_MAC",
+                    chip->Modify_SPI_Reg_bits(LMS7_G_PGA_RBB, pga));
+        }
+        if (iamp != -1)
+        {
+          error_catch("LMS7_MAC",
+                    chip->Modify_SPI_Reg_bits(LMS7_CG_IAMP_TBB, iamp));
+        }
+        if (txpad != -1)
+        {
+          error_catch("LMS7_MAC",
+                    chip->Modify_SPI_Reg_bits(LMS7_LOSS_MAIN_TXPAD_TRF, txpad));
+        }
+      }
+      chip->Modify_SPI_Reg_bits(LMS7_MAC, 1);
+    }
+  }
 };
 
 } // namespace srsran

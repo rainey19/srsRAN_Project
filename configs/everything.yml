@@ -1,0 +1,95 @@
+amf:
+  addr: 127.0.0.5
+  bind_addr: 127.0.0.1
+
+rf_driver:
+  device_driver: lime
+  # nrbandwidth, (rx/tx)lpf, (rx/tx)oversample, (rx/tx)gfir, (rx/tx)calibrate, (rx/tx)testSignal, (rx/tx)pathint, (rx/tx)path
+  # usepoll, rxPacketsInBatch, txMaxPacketsInBatch, rxSamplesInPacket, txSamplesInPacket
+  # lna:   0-min, 15-max
+  # pga:   0-min, 31-max
+  # iamp:  0-min, 64-max
+  # txpad: 0-max, 31-min
+  device_args: rxpath=LNAH,txpath=BAND1
+  clock:
+  sync:
+  srate: 11.52
+  otw_format: sc16
+  tx_gain: 70
+  rx_gain: 50
+  time_alignment_calibration: 400000
+
+cell_cfg:
+  dl_arfcn: 632628
+  # dl_arfcn: 519000
+  band: 78
+  # band: 41
+  channel_bandwidth_MHz: 10
+  common_scs: 30
+  plmn: "00101"
+  tac: 7
+  pci: 1
+  nof_antennas_ul: 1
+  nof_antennas_dl: 1
+
+  pdcch:
+    ss_type: ue_dedicated         # {common,ue_dedicated} SearchSpace type for UE data
+
+  pdsch:
+    min_ue_mcs:                   # [0 - 28] Minimum UE MCS
+    max_ue_mcs:                   # [0 - 28] Maximum UE MCS
+    fixed_rar_mcs: 0              # [0 - 28] Fixed RAR MCS
+    fixed_sib1_mcs: 5             # [0 - 28] Fixed SIB1 MCS
+    nof_harqs: 16                 # {2,4,6,8,10,12,16} Number of DL HARQ processes
+
+  pusch:
+    min_ue_mcs:                   # [0 - 28] Minimum UE MCS
+    max_ue_mcs:                   # [0 - 28] Maximum UE MCS
+                                
+  prach:
+    prach_config_index: 1         # [0 - 255] PRACH configuration index
+    prach_root_sequence_index: 1  # [0 - 837] PRACH root sequence index
+    zero_correlation_zone: 0      # [0 - 15]  Zero correlation zone index
+    fixed_msg3_mcs: 0             # [0 - 28]  Fixed message 3 MCS
+    max_msg3_harq_retx: 4         # [0 - 4]   Maximum number of message 3 HARQ retransmissions
+    total_nof_ra_preambles:       # [1 - 64]  Number of different PRACH preambles
+                                
+  amplitude_control:
+    tx_gain_backoff: 12           # Gain back-off to accommodate the signal PAPR in decibels
+    enable_clipping: 0            # Signal clipping
+    ceiling: -0.1                 # Clipping ceiling referenced to full scale
+
+  tdd_ul_dl_cfg:
+    pattern1:
+      dl_ul_tx_period: 5          # [0 - 10] TDD pattern periodicity in milliseconds
+      nof_dl_slots: 6             # [0 - 80] TDD pattern nof. consecutive full DL slots
+      nof_dl_symbols: 0           # [0 - 13] TDD pattern nof. DL symbols at the beginning of the slot following full DL slots
+      nof_ul_slots: 3             # [0 - 80] TDD pattern nof. consecutive full UL slots
+      nof_ul_symbols: 0           # [0 - 13] TDD pattern nof. UL symbols at the end of the slot preceding the first full UL slot
+
+    pattern2:
+      dl_ul_tx_period: 5          # [0 - 10] TDD pattern periodicity in milliseconds
+      nof_dl_slots: 6             # [0 - 80] TDD pattern nof. consecutive full DL slots
+      nof_dl_symbols: 0           # [0 - 13] TDD pattern nof. DL symbols at the beginning of the slot following full DL slots
+      nof_ul_slots: 3             # [0 - 80] TDD pattern nof. consecutive full UL slots
+      nof_ul_symbols: 0           # [0 - 13] TDD pattern nof. UL symbols at the end of the slot preceding the first full UL slot
+
+expert_phy:
+  low_phy_thread_profile: quad
+
+log:
+  filename: stdout
+  all_level: info
+  radio_level: info
+
+pcap:
+  mac_enable: false
+  mac_filename: /tmp/gnb_mac.pcap
+  ngap_enable: false
+  ngap_filename: /tmp/gnb_ngap.pcap
+
+# test_mode:
+#   test_ue:
+#     rnti: 123
+#     pdsch_active: 1
+#     pusch_active: 1

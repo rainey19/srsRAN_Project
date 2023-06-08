@@ -20,7 +20,7 @@
 
 set_directory_properties(PROPERTIES LABELS "phy")
 
-if (ZEROMQ_FOUND OR UHD_FOUND)
+if (ZEROMQ_FOUND OR UHD_FOUND OR LIME_FOUND)
 
     add_executable(radio_ssb radio_ssb.cpp lower_phy_example_factory.cpp upper_phy_ssb_example.cpp)
     target_link_libraries(radio_ssb
@@ -40,4 +40,4 @@ if (ZEROMQ_FOUND OR UHD_FOUND)
         add_test(radio_ssb_zmq_20MHz_n78 radio_ssb -P zmq_20MHz_n78 -D 10 -L 1 -v warning -du)
     endif (ZEROMQ_FOUND AND BUILD_TESTS)
 
-endif (ZEROMQ_FOUND OR UHD_FOUND)
+endif (ZEROMQ_FOUND OR UHD_FOUND OR LIME_FOUND)

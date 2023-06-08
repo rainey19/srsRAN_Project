@@ -1,33 +1,60 @@
 amf:
-  addr: 192.168.0.206
-  bind_addr: 192.168.0.116
+  addr: 127.0.0.5
+  bind_addr: 127.0.0.1
 
 rf_driver:
   device_driver: lime
-  device_args:
+  # nrbandwidth, (rx/tx)lpf, (rx/tx)oversample, (rx/tx)gfir, (rx/tx)calibrate, (rx/tx)testSignal, (rx/tx)pathint, (rx/tx)path
+  # usepoll, rxPacketsInBatch, txMaxPacketsInBatch, rxSamplesInPacket, txSamplesInPacket
+  # lna:   0-min, 15-max
+  # pga:   0-min, 31-max
+  # iamp:  0-min, 64-max
+  # txpad: 0-max, 31-min
+  device_args: rxpath=LNAH,txpath=BAND1,rxPacketsInBatch=1,txMaxPacketsInBatch=1
   clock:
   sync:
-  srate: 23.04
+  srate: 11.52
   otw_format: sc16
-  tx_gain: 50
-  rx_gain: 60
+  tx_gain: 70
+  rx_gain: 50
+  time_alignment_calibration: -270000     # Rx to Tx radio time alignment calibration in samples.
+                                          # Positive values reduce the RF transmission delay with respect
+                                          # to the RF reception, while negative values increase it
 
 cell_cfg:
   dl_arfcn: 632628
+  # dl_arfcn: 519000
   band: 78
-  channel_bandwidth_MHz: 20
+  # band: 41
+  channel_bandwidth_MHz: 10
   common_scs: 30
   plmn: "00101"
   tac: 7
   pci: 1
-      
+  nof_antennas_ul: 1
+  nof_antennas_dl: 1
+
+  amplitude_control:
+    tx_gain_backoff: 12           # Gain back-off to accommodate the signal PAPR in decibels
+    enable_clipping: 0            # Signal clipping
+    ceiling: -0.5                 # Clipping ceiling referenced to full scale
+
+expert_phy:
+  low_phy_thread_profile: quad
+
 log:
   filename: stdout
   all_level: info
-  radio_level: debug
+  radio_level: info
 
 pcap:
   mac_enable: false
   mac_filename: /tmp/gnb_mac.pcap
   ngap_enable: false
   ngap_filename: /tmp/gnb_ngap.pcap
+
+# test_mode:
+#   test_ue:
+#     rnti: 123
+#     pdsch_active: 1
+#     pusch_active: 1

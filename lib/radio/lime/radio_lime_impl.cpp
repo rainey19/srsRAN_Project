@@ -189,13 +189,13 @@ bool radio_session_lime_impl::start_rx_stream()
   // Immediate start of the stream.
   uint64_t time_spec = 0;
 
-  // Get current USRP time as timestamp.
+  // Get current radio time as timestamp.
   if (!device.get_time_now(time_spec)) {
     fmt::print("Error: getting time to start stream. {}.\n", device.get_error_message());
     return false;
   }
   // Add delay to current time.
-  time_spec += START_STREAM_DELAY_S;
+  time_spec += START_STREAM_DELAY_S * sampling_rate_hz;
 
   // Issue all streams to start.
   for (auto& stream : rx_streams) {
@@ -315,7 +315,7 @@ radio_session_lime_impl::radio_session_lime_impl(const radio_configuration::radi
     stream_description.id                                      = stream_idx;
     stream_description.otw_format                              = radio_config.otw_format;
     stream_description.srate_hz                                = radio_config.sampling_rate_hz;
-    stream_description.args                                    = stream.args;
+    stream_description.args                                    = radio_config.args;
 
     // Setup ports.
     for (unsigned channel_idx = 0; channel_idx != stream.channels.size(); ++channel_idx) {
@@ -365,7 +365,7 @@ radio_session_lime_impl::radio_session_lime_impl(const radio_configuration::radi
     stream_description.id                                      = stream_idx;
     stream_description.otw_format                              = radio_config.otw_format;
     stream_description.srate_Hz                                = radio_config.sampling_rate_hz;
-    stream_description.args                                    = stream.args;
+    stream_description.args                                    = radio_config.args;
 
     // Setup ports.
     for (unsigned channel_idx = 0; channel_idx != stream.channels.size(); ++channel_idx) {
@@ -422,6 +422,9 @@ radio_session_lime_impl::radio_session_lime_impl(const radio_configuration::radi
       return;
     }
   }
+
+  // Set the radio configuration.
+  device.execute_config(radio_config.args);
 
   // Transition to successfully initialized.
   state = states::SUCCESSFUL_INIT;

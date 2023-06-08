@@ -51,6 +51,7 @@ private:
   radio_notification_handler& notifier;
   /// Owns the LIME Tx stream.
   lime::SDRDevice* stream;
+  std::shared_ptr<LimeHandle> device;
   /// Maximum number of samples in a single packet.
   unsigned max_packet_size;
   /// Protects concurrent stream transmit.
@@ -61,6 +62,11 @@ private:
   unsigned nof_channels;
   /// Indicates the current internal state.
   radio_lime_tx_stream_fsm state_fsm;
+  /// Handle to logger object
+  srslog::basic_logger& logger;
+  /// Index of the RFIC (for SDRs with multiple chipsets such as X3 or X8)
+  uint8_t chipIndex;
+  int64_t txDeltaTS;
 
   /// Receive asynchronous message.
   void recv_async_msg(bool isTx, const lime::SDRDevice::StreamStats *s, void* userData);
@@ -96,7 +102,7 @@ public:
   /// \param[in] description Provides the stream configuration parameters.
   /// \param[in] async_executor_ Provides the asynchronous task executor.
   /// \param[in] notifier_ Provides the radio event notification handler.
-  radio_lime_tx_stream(std::shared_ptr<LimeHandle> device,
+  radio_lime_tx_stream(std::shared_ptr<LimeHandle> device_,
                       const stream_description&    description,
                       task_executor&               async_executor_,
                       radio_notification_handler&  notifier_);
