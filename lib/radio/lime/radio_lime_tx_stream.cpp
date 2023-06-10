@@ -24,37 +24,41 @@
 
 using namespace srsran;
 
-// TODO: use user_data to pass stream params that include samplerate
-void radio_lime_tx_stream::recv_async_msg(bool is_tx, const lime::SDRDevice::StreamStats *stream_stats, void* user_data)
+bool recv_async_msg(bool is_tx, const lime::SDRDevice::StreamStats *stream_stats, void* user_data)
 {
+  lime::callback_info_t* cbinf = (lime::callback_info_t*)user_data;
+  radio_notification_handler* notifier = (radio_notification_handler*)cbinf->notifier;
+  radio_lime_tx_stream_fsm* state_fsm = (radio_lime_tx_stream_fsm*)cbinf->state_fsm;
+  unsigned stream_id = cbinf->stream_id;
+
   // Handle event.
   radio_notification_handler::event_description event_description = {};
   event_description.stream_id                                     = stream_id;
   event_description.channel_id                                    = 0;
-  event_description.source                                        = radio_notification_handler::event_source::TRANSMIT;
+  event_description.source                                        = (is_tx) ? (radio_notification_handler::event_source::TRANSMIT)
+                                                                            : (radio_notification_handler::event_source::RECEIVE);
   event_description.type                                          = radio_notification_handler::event_type::UNDEFINED;
 
-  if(is_tx)
+  if (stream_stats->underrun)
   {
-    if (stream_stats->underrun)
-    {
-      event_description.type = radio_notification_handler::event_type::UNDERFLOW;
-      state_fsm.async_event_late_underflow(stream_stats->timestamp);
-    }
-
-    if (stream_stats->overrun || stream_stats->loss)
-    {
-      event_description.type = radio_notification_handler::event_type::OTHER;
-    }
-  
-    if (stream_stats->late)
-    {
-      event_description.type = radio_notification_handler::event_type::LATE;
-      state_fsm.async_event_late_underflow(stream_stats->timestamp);
-    }
-
-    notifier.on_radio_rt_event(event_description);
+    event_description.type = radio_notification_handler::event_type::UNDERFLOW;
+    state_fsm->async_event_late_underflow(stream_stats->timestamp);
   }
+
+  if (stream_stats->overrun || stream_stats->loss)
+  {
+    event_description.type = radio_notification_handler::event_type::OTHER;
+  }
+
+  if (stream_stats->late)
+  {
+    event_description.type = radio_notification_handler::event_type::LATE;
+    state_fsm->async_event_late_underflow(stream_stats->timestamp);
+  }
+
+  notifier->on_radio_rt_event(event_description);
+
+  return true;
 }
 
 bool radio_lime_tx_stream::transmit_block(unsigned&               nof_txd_samples,
@@ -62,7 +66,6 @@ bool radio_lime_tx_stream::transmit_block(unsigned&               nof_txd_sample
                                          unsigned                 buffer_offset,
                                          uint64_t                 time_spec)
 {
-  static uint64_t fsdfsd = 0;
   // if (state_fsm.is_stopped()) {
   //   return false;
   // }
@@ -82,7 +85,7 @@ bool radio_lime_tx_stream::transmit_block(unsigned&               nof_txd_sample
   //   return true;
   // }
   meta.flush=false;
-  meta.timestamp=time_spec; // + txDeltaTS;
+  meta.timestamp=time_spec;
   meta.useTimestamp=true;
 
   // Flatten buffers.
@@ -93,26 +96,10 @@ bool radio_lime_tx_stream::transmit_block(unsigned&               nof_txd_sample
 
   const lime::complex32f_t** buffer = const_cast<const lime::complex32f_t **>((lime::complex32f_t**)buffs_flat_ptr.data());
 
-  lime::SDRDevice::StreamStats tx_status, rx_status;
-  stream->StreamStatus(chipIndex, &rx_status, &tx_status);
-  if (!(fsdfsd%10000))
-  {
-    if (time_spec > rx_status.timestamp)
-    {
-      printf("TS: %lu, RXTS: %lu, delta: -%lu\n", time_spec, rx_status.timestamp, time_spec-rx_status.timestamp );
-    }
-    else
-    {
-      printf("TS: %lu, RXTS: %lu, delta: %lu\n", time_spec, rx_status.timestamp, rx_status.timestamp-time_spec );
-    }
-  }
-  fsdfsd++;
-  // meta.timestamp = rx_status.timestamp + 400e3;
-
   // Safe transmission.
-  // return safe_execution([this, &buffer, num_samples, &meta, &nof_txd_samples]() {
+  return safe_execution([this, &buffer, num_samples, &meta, &nof_txd_samples]() {
   nof_txd_samples = stream->StreamTx(chipIndex, buffer, num_samples, &meta);
-  // });
+  });
 
   return true; 
 }
@@ -161,6 +148,7 @@ radio_lime_tx_stream::radio_lime_tx_stream(std::shared_ptr<LimeHandle> device_,
   device->GetStreamConfig().txCount       = nof_channels;
   device->GetStreamConfig().alignPhase    = (nof_channels>1) ? true : false;
   device->GetStreamConfig().hintSampleRate = srate_hz;
+  device->GetStreamConfig().userData = malloc(sizeof(lime::callback_info_t));
   for (unsigned int i=0; i<nof_channels; i++)
   {
     device->GetStreamConfig().txChannels[i] = i;
@@ -267,19 +255,15 @@ radio_lime_tx_stream::radio_lime_tx_stream(std::shared_ptr<LimeHandle> device_,
   } 
 
   // Set max packet size.
-  // BENTODO: This might need to be 256?
-  // max_packet_size = (wire_format == lime::SDRDevice::StreamConfig::I12 ? 1360 : 1020)/nof_channels;
-  max_packet_size = 256;
-
-  float txTimeOffset = 0.005; // tx packets delay in time (seconds), will be rounded to even packets count
-  txDeltaTS = (int)(txTimeOffset*srate_hz/max_packet_size)*max_packet_size;
+  // TODO: This might need to be 256?
+  max_packet_size = (wire_format == lime::SDRDevice::StreamConfig::I12 ? 1360 : 1020)/nof_channels;
+  // max_packet_size = 256;
 
   // Notify FSM that it was successfully initialized.
   state_fsm.init_successful();
 
   // Create asynchronous task.
-  // TODO: doesn't work because callback is non-static member function
-  // device->GetStreamConfig().statusCallback = recv_async_msg;
+  device->GetStreamConfig().statusCallback = recv_async_msg;
 }
 
 void radio_lime_tx_stream::transmit(baseband_gateway_buffer& data, const baseband_gateway_transmitter::metadata& tx_md)

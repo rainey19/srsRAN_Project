@@ -66,10 +66,6 @@ private:
   srslog::basic_logger& logger;
   /// Index of the RFIC (for SDRs with multiple chipsets such as X3 or X8)
   uint8_t chipIndex;
-  int64_t txDeltaTS;
-
-  /// Receive asynchronous message.
-  void recv_async_msg(bool isTx, const lime::SDRDevice::StreamStats *s, void* userData);
 
   /// \brief Transmits a single baseband block.
   /// \param[out] nof_txd_samples Number of transmitted samples.

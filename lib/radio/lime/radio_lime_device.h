@@ -315,44 +315,8 @@ public:
     device->GetDeviceConfig().skipDefaults = true; // defaults are already initialized once at the startup
     device->dev()->Configure(device->GetDeviceConfig(), 0);
 
-    /*// Temporary gain setting hack
-    set_gain_hack(dev_args);
-
-    if (device->GetDeviceConfig().channel[0].rx.gain == 69)
-    {
-      logger.debug("Calibration style 1");
-      device->GetDeviceConfig().channel[0].rx.calibrate = true;
-      device->GetDeviceConfig().channel[0].tx.calibrate = true;
-      device->GetDeviceConfig().channel[1].rx.calibrate = true;
-      device->GetDeviceConfig().channel[1].tx.calibrate = true;
-      logger.debug("Attempting calibration");
-      device->dev()->Configure(device->GetDeviceConfig(), 0);
-      logger.debug("Finished");
-    }
-    else if (device->GetDeviceConfig().channel[0].rx.gain == 55)
-    {
-      logger.debug("Calibration style 2");
-      device->GetDeviceConfig().channel[0].rx.calibrate = true;
-      device->GetDeviceConfig().channel[0].tx.calibrate = true;
-      device->GetDeviceConfig().channel[1].rx.calibrate = true;
-      device->GetDeviceConfig().channel[1].tx.calibrate = true;
-      logger.debug("Setting paths to loopback");
-      uint8_t rx_path = device->GetDeviceConfig().channel[0].rx.path;
-      uint8_t tx_path = device->GetDeviceConfig().channel[0].tx.path;
-      logger.debug("Saved old paths (rx={}, tx={})", rx_path, tx_path);
-      device->GetDeviceConfig().channel[0].rx.path = 0;
-      device->GetDeviceConfig().channel[0].tx.path = 0;
-      device->GetDeviceConfig().channel[1].rx.path = 0;
-      device->GetDeviceConfig().channel[1].tx.path = 0;
-      logger.debug("Attempting calibration");
-      device->dev()->Configure(device->GetDeviceConfig(), 0);
-      logger.debug("Finished");
-      device->GetDeviceConfig().channel[0].rx.path = rx_path;
-      device->GetDeviceConfig().channel[0].tx.path = tx_path;
-      device->GetDeviceConfig().channel[1].rx.path = rx_path;
-      device->GetDeviceConfig().channel[1].tx.path = tx_path;
-      logger.debug("Returned paths to previous (rx={}, tx={})", rx_path, tx_path);
-    }*/
+    // Temporary gain setting hack
+    // set_gain_hack(dev_args);
 
     auto t2 = std::chrono::high_resolution_clock::now();
     logger.debug("Radio configured in {}ms.", std::chrono::duration_cast<std::chrono::milliseconds>(t2-t1).count());

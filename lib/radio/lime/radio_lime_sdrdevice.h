@@ -44,4 +44,10 @@ namespace lime
         r = (ts % fs);
         return (int64_t)n * 1000000 + (((int64_t)r * 1000000) / fs);
     }
+
+    typedef struct {
+        unsigned stream_id;
+        void* state_fsm;
+        void* notifier;
+    } callback_info_t;
 }

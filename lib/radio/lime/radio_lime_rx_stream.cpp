@@ -50,16 +50,6 @@ bool radio_lime_rx_stream::receive_block(unsigned&                   nof_rxd_sam
     buffs_flat_ptr[channel] = (void*)data[channel].subspan(offset, num_samples).data();
   }
 
-  // TODO:
-  // Figure out a way to delay the stream starting until the timestamp occurs
-  // Or is it even necessary?
-  // uint64_t* starting_timestamp = (uint64_t*)device->GetStreamConfig().userData;
-  // if (*starting_timestamp != 0)
-  // {
-  //   md.timestamp = *starting_timestamp;
-  //   *starting_timestamp = 0;
-  // }
-
   md.timestamp = 0;
 
   return safe_execution([this, buffs_flat_ptr, num_samples, &md, &nof_rxd_samples]() {
@@ -219,9 +209,9 @@ radio_lime_rx_stream::radio_lime_rx_stream(std::shared_ptr<LimeHandle> device_,
   } 
 
   // Set max packet size.
-  // BENTODO: This might need to be 256?
+  // TODO: This might need to be 256?
   max_packet_size = (wire_format == lime::SDRDevice::StreamConfig::I12 ? 1360 : 1020)/nof_channels;
-  max_packet_size = 256;
+  // max_packet_size = 256;
 
   state = states::SUCCESSFUL_INIT;
 }
@@ -231,10 +221,6 @@ bool radio_lime_rx_stream::start(const uint64_t time_spec)
   if (state != states::SUCCESSFUL_INIT) {
     return true;
   }
-
-  // Save the starting timestamp. I think this only matters for UHD? IDK!
-  device->GetStreamConfig().userData = malloc(sizeof(uint64_t));
-  *((uint64_t*)device->GetStreamConfig().userData) = time_spec;
 
   if (!safe_execution([this]() {
         stream->StreamSetup(device->GetStreamConfig(), chipIndex);
@@ -255,7 +241,6 @@ baseband_gateway_receiver::metadata radio_lime_rx_stream::receive(baseband_gatew
   lime::SDRDevice::StreamMeta         md;
   unsigned                            nsamples            = buffs[0].size();
   unsigned                            rxd_samples_total   = 0;
-  // unsigned                            timeout_trial_count = 0;
 
   // Receive stream in multiple blocks.
   while (rxd_samples_total < nsamples) {
@@ -265,6 +250,7 @@ baseband_gateway_receiver::metadata radio_lime_rx_stream::receive(baseband_gatew
       return {};
     }
 
+    // TODO: try this
     // Save timespec for first block.
     // if (rxd_samples_total == 0) {
     //   ret.ts = md.timestamp;
@@ -280,37 +266,6 @@ baseband_gateway_receiver::metadata radio_lime_rx_stream::receive(baseband_gatew
     event.channel_id                                    = radio_notification_handler::UNKNOWN_ID;
     event.source                                        = radio_notification_handler::event_source::RECEIVE;
     event.type                                          = radio_notification_handler::event_type::UNDEFINED;
-
-    // TODO
-    // Handle error.
-    /*switch (md.error_code) {
-      case lime::rx_metadata_t::ERROR_CODE_TIMEOUT:
-        ++timeout_trial_count;
-        if (timeout_trial_count >= 10) {
-          logger.error("Exceeded maximum number of timed out transmissions.");
-          return ret;
-        }
-        break;
-      case lime::rx_metadata_t::ERROR_CODE_NONE:
-        // Ignored.
-        break;
-      case lime::rx_metadata_t::ERROR_CODE_LATE_COMMAND:
-        event.type = radio_notification_handler::event_type::LATE;
-        break;
-      case lime::rx_metadata_t::ERROR_CODE_OVERFLOW:
-        event.type = radio_notification_handler::event_type::OVERFLOW;
-        break;
-      case lime::rx_metadata_t::ERROR_CODE_BROKEN_CHAIN:
-      case lime::rx_metadata_t::ERROR_CODE_ALIGNMENT:
-      case lime::rx_metadata_t::ERROR_CODE_BAD_PACKET:
-        logger.error("Unhandled error in Rx metadata {}.", md.strerror().c_str());
-        return ret;
-    }
-
-    // Notify if the event type was set.
-    if (event.type != radio_notification_handler::event_type::UNDEFINED) {
-      notifier.on_radio_rt_event(event);
-    }*/
   }
 
   // If it reaches here, there is no error.

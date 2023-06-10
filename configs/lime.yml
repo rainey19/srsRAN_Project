@@ -1,6 +1,6 @@
 amf:
-  addr: 127.0.0.5
-  bind_addr: 127.0.0.1
+  addr: 192.168.0.206
+  bind_addr: 192.168.0.117
 
 rf_driver:
   device_driver: lime
@@ -10,14 +10,14 @@ rf_driver:
   # pga:   0-min, 31-max
   # iamp:  0-min, 64-max
   # txpad: 0-max, 31-min
-  device_args: rxpath=LNAH,txpath=BAND1,rxPacketsInBatch=1,txMaxPacketsInBatch=1
+  device_args: rxpath=LNAH,txpath=BAND1,rxPacketsInBatch=1,txMaxPacketsInBatch=1,rxSamplesInPacket=1024,txSamplesInPacket=1024
   clock:
   sync:
   srate: 11.52
   otw_format: sc16
   tx_gain: 70
   rx_gain: 50
-  time_alignment_calibration: -270000     # Rx to Tx radio time alignment calibration in samples.
+  time_alignment_calibration:             # Rx to Tx radio time alignment calibration in samples.
                                           # Positive values reduce the RF transmission delay with respect
                                           # to the RF reception, while negative values increase it
 
