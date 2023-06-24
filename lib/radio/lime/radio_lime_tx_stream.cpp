@@ -247,6 +247,10 @@ radio_lime_tx_stream::radio_lime_tx_stream(std::shared_ptr<LimeHandle> device_,
         unsigned long number = std::stoul(arg.second, nullptr, 10);
         device->GetStreamConfig().extraConfig->txSamplesInPacket = number;
       }
+      else if (arg.first == "lmsconfig")
+      {
+        device->GetLMSConfPath() = arg.second;
+      }
       else
         continue;
 

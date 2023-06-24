@@ -25,6 +25,7 @@ public:
 
 	lime::SDRDevice::SDRConfig& GetDeviceConfig() { return _dev_config; }
 	lime::SDRDevice::StreamConfig& GetStreamConfig() { return _stream_config; }
+	std::string& GetLMSConfPath() { return config_path; }
 
 	static std::shared_ptr<LimeHandle> get(lime::DeviceHandle& devHandle);
 
@@ -34,6 +35,7 @@ protected:
 	lime::SDRDevice* _dev = NULL;
 	lime::SDRDevice::SDRConfig _dev_config;
 	lime::SDRDevice::StreamConfig _stream_config;
+	std::string config_path = "";
 
 	unsigned devcnt;
 

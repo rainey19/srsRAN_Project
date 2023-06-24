@@ -314,6 +314,17 @@ public:
 
     device->GetDeviceConfig().skipDefaults = true; // defaults are already initialized once at the startup
     device->dev()->Configure(device->GetDeviceConfig(), 0);
+    
+    if (device->GetLMSConfPath() != "")
+    {
+      lime::LMS7002M* chip = static_cast<lime::LMS7002M*>(device->dev()->GetInternalChip(0));
+      chip->LoadConfig(device->GetLMSConfPath().c_str());
+    }
+    // else
+    // {
+    //   device->GetDeviceConfig().skipDefaults = true; // defaults are already initialized once at the startup
+    //   device->dev()->Configure(device->GetDeviceConfig(), 0);
+    // }
 
     // Temporary gain setting hack
     // set_gain_hack(dev_args);
