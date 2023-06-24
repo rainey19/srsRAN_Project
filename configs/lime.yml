@@ -1,16 +1,16 @@
 amf:
   addr: 192.168.0.206
-  bind_addr: 192.168.0.117
+  bind_addr: 192.168.0.116
 
 rf_driver:
   device_driver: lime
   # nrbandwidth, (rx/tx)lpf, (rx/tx)oversample, (rx/tx)gfir, (rx/tx)calibrate, (rx/tx)testSignal, (rx/tx)pathint, (rx/tx)path
-  # usepoll, rxPacketsInBatch, txMaxPacketsInBatch, rxSamplesInPacket, txSamplesInPacket
+  # usepoll, rxPacketsInBatch, txMaxPacketsInBatch, rxSamplesInPacket, txSamplesInPacket, lmsconfig
   # lna:   0-min, 15-max
   # pga:   0-min, 31-max
   # iamp:  0-min, 64-max
   # txpad: 0-max, 31-min
-  device_args: rxpath=LNAH,txpath=BAND1,rxPacketsInBatch=1,txMaxPacketsInBatch=1,rxSamplesInPacket=1024,txSamplesInPacket=1024
+  device_args: rxpath=LNAH,txpath=BAND1,rxPacketsInBatch=1,txMaxPacketsInBatch=1,rxSamplesInPacket=1024,txSamplesInPacket=1024,lmsconfig=/home/user/repos/srsRAN_Project/configs/lms/xtrx_config.ini
   clock:
   sync:
   srate: 11.52
@@ -22,9 +22,11 @@ rf_driver:
                                           # to the RF reception, while negative values increase it
 
 cell_cfg:
+  # dl_arfcn: 368640
+  # band: 3
   dl_arfcn: 632628
-  # dl_arfcn: 519000
   band: 78
+  # dl_arfcn: 519000
   # band: 41
   channel_bandwidth_MHz: 10
   common_scs: 30
@@ -43,9 +45,10 @@ expert_phy:
   low_phy_thread_profile: quad
 
 log:
-  filename: stdout
+  # filename: stdout
+  filename: /tmp/srslog.txt
   all_level: info
-  radio_level: info
+  # radio_level: debug
 
 pcap:
   mac_enable: false
