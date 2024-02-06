@@ -1,6 +1,6 @@
 /*
  *
- * Copyright 2021-2023 Software Radio Systems Limited
+ * Copyright 2021-2024 Software Radio Systems Limited
  *
  * This file is part of srsRAN.
  *
@@ -113,17 +113,17 @@ public:
     {
       logger.debug("Available LMS7002M devices:");
       for (const auto &dev : devHandles) {
-        logger.debug("\t\"{}\"", dev.serialize().c_str());
+        logger.debug("\t\"{}\"", dev.Serialize().c_str());
       }
     }
 
     // Connect and initialize
     lime::DeviceHandle first_device_ = devHandles.front();
-    logger.debug("Selected: {}", first_device_.serialize().c_str());
+    logger.debug("Selected: {}", first_device_.Serialize().c_str());
     device = LimeHandle::get(first_device_);
     if (device == nullptr)
     {
-      logger.error("Port[0] failed to connect: {}", first_device_.serialize().c_str());
+      logger.error("Port[0] failed to connect: {}", first_device_.Serialize().c_str());
       return false;
     }
 
@@ -225,7 +225,7 @@ public:
         {
           ref_freq = 31.22e6;
         }
-        device->dev()->SetClockFreq(lime::SDRDevice::ClockID::CLK_REFERENCE, ref_freq, 0);
+        device->dev()->SetClockFreq((uint8_t)lime::LMS7002M::ClockID::CLK_REFERENCE, ref_freq, 0);
       }
     });
   }
@@ -277,6 +277,7 @@ public:
 
   bool set_command_time(const uint64_t timespec)
   {
+    // TODO: ?
     return true;
   }
 
@@ -337,6 +338,8 @@ public:
   {
     logger.debug("Setting channel {} Tx gain to {:.2f} dB.", ch, gain);
 
+    // TODO!
+
     return safe_execution([this, ch, gain]() {
       lime::Range range(0, 70, 0.1);
 
@@ -352,14 +355,16 @@ public:
       // TODO: not implemented in limesuite yet!
       // LMS_SetGaindB(device->dev(), true, ch, gain);
 
-      lime::SDRDevice::SDRConfig& conf = device->GetDeviceConfig();
-      conf.channel[ch].tx.gain = gain;
+      // lime::SDRDevice::SDRConfig& conf = device->GetDeviceConfig();
+      // conf.channel[ch].tx.gain = gain;
     });
   }
 
   bool set_rx_gain(size_t ch, double gain)
   {
     logger.debug("Setting channel {} Rx gain to {:.2f} dB.", ch, gain);
+
+    // TODO!
 
     return safe_execution([this, ch, gain]() {
       lime::Range range(0, 70, 0.1);
@@ -376,8 +381,8 @@ public:
       // TODO: not implemented in limesuite yet!
       // LMS_SetGaindB(device->dev(), false, ch, gain);
 
-      lime::SDRDevice::SDRConfig& conf = device->GetDeviceConfig();
-      conf.channel[ch].rx.gain = gain;
+      // lime::SDRDevice::SDRConfig& conf = device->GetDeviceConfig();
+      // conf.channel[ch].rx.gain = gain;
     });
   }
 
@@ -387,9 +392,6 @@ public:
 
     return safe_execution([this, ch, &config]() {
       lime::Range range(0, 3.7e9, 1);
-
-      // TODO: not implemented in limesuite yet
-      // LMS_GetSampleRateRange(device->dev(), false, &range);
 
       if (!radio_lime_device_validate_freq_range(range, config.center_frequency_hz)) {
         on_error("Tx RF frequency {} MHz is out-of-range. Range is {} - {}.",
@@ -410,9 +412,6 @@ public:
 
     return safe_execution([this, ch, &config]() {
       lime::Range range(0, 3.7e9, 1);
-
-      // TODO: not implemented in limesuite yet
-      // LMS_GetSampleRateRange(device->dev(), false, &range);
 
       if (!radio_lime_device_validate_freq_range(range, config.center_frequency_hz)) {
         on_error("Rx RF frequency {} MHz is out-of-range. Range is {} - {}.",

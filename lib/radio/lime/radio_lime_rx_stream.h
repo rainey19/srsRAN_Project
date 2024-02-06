@@ -1,6 +1,6 @@
 /*
  *
- * Copyright 2021-2023 Software Radio Systems Limited
+ * Copyright 2021-2024 Software Radio Systems Limited
  *
  * This file is part of srsRAN.
  *
@@ -24,15 +24,15 @@
 
 #include "radio_lime_exception_handler.h"
 #include "radio_lime_sdrdevice.h"
-#include "srsran/gateways/baseband/baseband_gateway_buffer.h"
 #include "srsran/gateways/baseband/baseband_gateway_receiver.h"
+#include "srsran/gateways/baseband/buffer/baseband_gateway_buffer_writer.h"
 #include "srsran/radio/radio_configuration.h"
 #include "srsran/radio/radio_notification_handler.h"
 #include <mutex>
 
 namespace srsran {
 
-/// Implements a gateway receiver based on LIME receive stream.
+/// Implements a gateway receiver based on Lime receive stream.
 class radio_lime_rx_stream : public lime_exception_handler, public baseband_gateway_receiver
 {
 private:
@@ -51,7 +51,7 @@ private:
   double srate_Hz;
   /// Radio notification interface.
   radio_notification_handler& notifier;
-  /// Owns the LIME Tx stream.
+  /// Owns the Lime Tx stream.
   lime::SDRDevice* stream;
   std::shared_ptr<LimeHandle> device;
   /// Maximum number of samples in a single packet.
@@ -71,13 +71,13 @@ private:
   /// \param[in] buffer_offset Indicates the data offset in the reception buffers.
   /// \param[in] metadata Provides the reception metadata.
   /// \return True if no exception is caught. Otherwise false.
-  bool receive_block(unsigned&                   nof_rxd_samples,
-                    baseband_gateway_buffer&     data,
-                    unsigned                     offset,
-                    lime::SDRDevice::StreamMeta& md);
+  bool receive_block(unsigned&                       nof_rxd_samples,
+                     baseband_gateway_buffer_writer& buffs,
+                     unsigned                        buffer_offset,
+                     lime::SDRDevice::StreamMeta&    md);
 
 public:
-  /// Describes the necessary parameters to create an LIME transmit stream.
+  /// Describes the necessary parameters to create a Lime transmit stream.
   struct stream_description {
     /// Identifies the stream.
     unsigned id;
@@ -91,7 +91,7 @@ public:
     std::vector<size_t> ports;
   };
 
-  /// \brief Constructs a receive LIME stream.
+  /// \brief Constructs a receive Lime stream.
   /// \param[in] usrp Provides the USRP context.
   /// \param[in] description Provides the stream configuration parameters.
   /// \param[in] notifier_ Provides the radio event notification handler.
@@ -104,11 +104,11 @@ public:
   /// \return True if no exception is caught. Otherwise false.
   bool start(const uint64_t time_spec);
 
-  // See interface for documentation.
-  unsigned get_buffer_size() const override;
+  /// Gets the optimal transmitter buffer size.
+  unsigned get_buffer_size() const;
 
   // See interface for documentation.
-  metadata receive(baseband_gateway_buffer& data) override;
+  metadata receive(baseband_gateway_buffer_writer& data) override;
 
   /// \brief Stops the reception stream.
   /// \return True if no exception is caught. Otherwise false.

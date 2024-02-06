@@ -354,7 +354,7 @@ int main(int argc, char** argv)
 
   // Create radio.
   radio = factory->create(config, *async_task_executor, notification_handler);
-  radio->start();
+  radio->start(0);
   report_fatal_error_if_not(radio, "Failed to create radio.");
 
   // Set signal handler.

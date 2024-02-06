@@ -1,6 +1,6 @@
 /*
  *
- * Copyright 2021-2023 Software Radio Systems Limited
+ * Copyright 2021-2024 Software Radio Systems Limited
  *
  * This file is part of srsRAN.
  *
@@ -24,10 +24,10 @@
 
 using namespace srsran;
 
-bool radio_lime_rx_stream::receive_block(unsigned&                   nof_rxd_samples,
-                                        baseband_gateway_buffer&     data,
-                                        unsigned                     offset,
-                                        lime::SDRDevice::StreamMeta& md)
+bool radio_lime_rx_stream::receive_block(unsigned&                       nof_rxd_samples,
+                                         baseband_gateway_buffer_writer& data,
+                                         unsigned                        offset,
+                                         lime::SDRDevice::StreamMeta&    md)
 {
   // Extract number of samples.
   unsigned num_samples = data.get_nof_samples() - offset;
@@ -83,10 +83,10 @@ radio_lime_rx_stream::radio_lime_rx_stream(std::shared_ptr<LimeHandle> device_,
   switch (description.otw_format) {
     case radio_configuration::over_the_wire_format::DEFAULT:
     case radio_configuration::over_the_wire_format::SC16:
-      wire_format = lime::SDRDevice::StreamConfig::I16;
+      wire_format = lime::SDRDevice::StreamConfig::DataFormat::I16;
       break;
     case radio_configuration::over_the_wire_format::SC12:
-      wire_format = lime::SDRDevice::StreamConfig::I12;
+      wire_format = lime::SDRDevice::StreamConfig::DataFormat::I12;
       break;
     case radio_configuration::over_the_wire_format::SC8:
     default:
@@ -210,7 +210,7 @@ radio_lime_rx_stream::radio_lime_rx_stream(std::shared_ptr<LimeHandle> device_,
 
   // Set max packet size.
   // TODO: This might need to be 256?
-  max_packet_size = (wire_format == lime::SDRDevice::StreamConfig::I12 ? 1360 : 1020)/nof_channels;
+  max_packet_size = (wire_format == lime::SDRDevice::StreamConfig::DataFormat::I12 ? 1360 : 1020)/nof_channels;
   // max_packet_size = 256;
 
   state = states::SUCCESSFUL_INIT;
@@ -235,17 +235,17 @@ bool radio_lime_rx_stream::start(const uint64_t time_spec)
   return true;
 }
 
-baseband_gateway_receiver::metadata radio_lime_rx_stream::receive(baseband_gateway_buffer& buffs)
+baseband_gateway_receiver::metadata radio_lime_rx_stream::receive(baseband_gateway_buffer_writer& data)
 {
   baseband_gateway_receiver::metadata ret = {};
   lime::SDRDevice::StreamMeta         md;
-  unsigned                            nsamples            = buffs[0].size();
+  unsigned                            nsamples            = data[0].size();
   unsigned                            rxd_samples_total   = 0;
 
   // Receive stream in multiple blocks.
   while (rxd_samples_total < nsamples) {
     unsigned rxd_samples = 0;
-    if (!receive_block(rxd_samples, buffs, rxd_samples_total, md)) {
+    if (!receive_block(rxd_samples, data, rxd_samples_total, md)) {
       logger.error("Failed receiving packet. {}.", get_error_message().c_str());
       return {};
     }

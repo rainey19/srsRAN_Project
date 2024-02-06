@@ -1,6 +1,6 @@
 /*
  *
- * Copyright 2021-2023 Software Radio Systems Limited
+ * Copyright 2021-2024 Software Radio Systems Limited
  *
  * This file is part of srsRAN.
  *
@@ -25,8 +25,9 @@
 #include "radio_lime_exception_handler.h"
 #include "radio_lime_sdrdevice.h"
 #include "radio_lime_tx_stream_fsm.h"
-#include "srsran/gateways/baseband/baseband_gateway_buffer.h"
 #include "srsran/gateways/baseband/baseband_gateway_transmitter.h"
+#include "srsran/gateways/baseband/buffer/baseband_gateway_buffer_dynamic.h"
+#include "srsran/gateways/baseband/buffer/baseband_gateway_buffer_reader.h"
 #include "srsran/radio/radio_configuration.h"
 #include "srsran/radio/radio_notification_handler.h"
 #include "srsran/support/executors/task_executor.h"
@@ -73,13 +74,13 @@ private:
   /// \param[in] offset           Sample offset in the transmit buffers.
   /// \param[in] time_spec        Transmission timestamp.
   /// \return True if no exception is caught in the transmission process, false otherwise.
-  bool transmit_block(unsigned&                nof_txd_samples,
-                      baseband_gateway_buffer& data,
-                      unsigned                 offset,
-                      uint64_t                time_spec);
+  bool transmit_block(unsigned&                             nof_txd_samples,
+                      const baseband_gateway_buffer_reader& data,
+                      unsigned                              offset,
+                      uint64_t                              time_spec);
 
 public:
-  /// Describes the necessary parameters to create an LIME transmit stream.
+  /// Describes the necessary parameters to create a Lime transmit stream.
   struct stream_description {
     /// Identifies the stream.
     unsigned id;
@@ -93,7 +94,7 @@ public:
     std::vector<size_t> ports;
   };
 
-  /// \brief Constructs an LIME transmit stream.
+  /// \brief Constructs a Lime transmit stream.
   /// \param[in] usrp Provides the USRP context.
   /// \param[in] description Provides the stream configuration parameters.
   /// \param[in] async_executor_ Provides the asynchronous task executor.
@@ -103,10 +104,11 @@ public:
                       task_executor&               async_executor_,
                       radio_notification_handler&  notifier_);
 
-  unsigned get_buffer_size() const override;
+  unsigned get_buffer_size() const;
 
   // See interface for documentation.
-  void transmit(baseband_gateway_buffer& data, const metadata& metadata) override;
+  void transmit(const baseband_gateway_buffer_reader&        data,
+                const baseband_gateway_transmitter_metadata& metadata) override;
 
   /// Stop the transmission.
   void stop();

@@ -1,6 +1,6 @@
 /*
  *
- * Copyright 2021-2023 Software Radio Systems Limited
+ * Copyright 2021-2024 Software Radio Systems Limited
  *
  * This file is part of srsRAN.
  *
@@ -61,10 +61,10 @@ bool recv_async_msg(bool is_tx, const lime::SDRDevice::StreamStats *stream_stats
   return true;
 }
 
-bool radio_lime_tx_stream::transmit_block(unsigned&               nof_txd_samples,
-                                         baseband_gateway_buffer& buffs,
-                                         unsigned                 buffer_offset,
-                                         uint64_t                 time_spec)
+bool radio_lime_tx_stream::transmit_block(unsigned&                            nof_txd_samples,
+                                         const baseband_gateway_buffer_reader& buffs,
+                                         unsigned                              buffer_offset,
+                                         uint64_t                              time_spec)
 {
   // if (state_fsm.is_stopped()) {
   //   return false;
@@ -84,6 +84,8 @@ bool radio_lime_tx_stream::transmit_block(unsigned&               nof_txd_sample
   //   nof_txd_samples = num_samples;
   //   return true;
   // }
+  // TODO: add burst flags back in!
+  // meta.flush = (md->flags & TRX_WRITE_MD_FLAG_END_OF_BURST);
   meta.flush=false;
   meta.timestamp=time_spec;
   meta.useTimestamp=true;
@@ -99,6 +101,7 @@ bool radio_lime_tx_stream::transmit_block(unsigned&               nof_txd_sample
   // Safe transmission.
   return safe_execution([this, &buffer, num_samples, &meta, &nof_txd_samples]() {
   nof_txd_samples = stream->StreamTx(chipIndex, buffer, num_samples, &meta);
+  // TODO: if nof_txd_samples < 0, increment underrun flag!
   });
 
   return true; 
@@ -132,10 +135,10 @@ radio_lime_tx_stream::radio_lime_tx_stream(std::shared_ptr<LimeHandle> device_,
   switch (description.otw_format) {
     case radio_configuration::over_the_wire_format::DEFAULT:
     case radio_configuration::over_the_wire_format::SC16:
-      wire_format = lime::SDRDevice::StreamConfig::I16;
+      wire_format = lime::SDRDevice::StreamConfig::DataFormat::I16;
       break;
     case radio_configuration::over_the_wire_format::SC12:
-      wire_format = lime::SDRDevice::StreamConfig::I12;
+      wire_format = lime::SDRDevice::StreamConfig::DataFormat::I12;
       break;
     case radio_configuration::over_the_wire_format::SC8:
     default:
@@ -144,7 +147,7 @@ radio_lime_tx_stream::radio_lime_tx_stream(std::shared_ptr<LimeHandle> device_,
   }
 
   device->GetStreamConfig().linkFormat    = wire_format;
-  device->GetStreamConfig().format        = lime::SDRDevice::StreamConfig::F32;
+  device->GetStreamConfig().format        = lime::SDRDevice::StreamConfig::DataFormat::F32;
   device->GetStreamConfig().txCount       = nof_channels;
   device->GetStreamConfig().alignPhase    = (nof_channels>1) ? true : false;
   device->GetStreamConfig().hintSampleRate = srate_hz;
@@ -260,7 +263,7 @@ radio_lime_tx_stream::radio_lime_tx_stream(std::shared_ptr<LimeHandle> device_,
 
   // Set max packet size.
   // TODO: This might need to be 256?
-  max_packet_size = (wire_format == lime::SDRDevice::StreamConfig::I12 ? 1360 : 1020)/nof_channels;
+  max_packet_size = (wire_format == lime::SDRDevice::StreamConfig::DataFormat::I12 ? 1360 : 1020)/nof_channels;
   // max_packet_size = 256;
 
   // Notify FSM that it was successfully initialized.
@@ -270,7 +273,7 @@ radio_lime_tx_stream::radio_lime_tx_stream(std::shared_ptr<LimeHandle> device_,
   device->GetStreamConfig().statusCallback = recv_async_msg;
 }
 
-void radio_lime_tx_stream::transmit(baseband_gateway_buffer& data, const baseband_gateway_transmitter::metadata& tx_md)
+void radio_lime_tx_stream::transmit(const baseband_gateway_buffer_reader& data, const baseband_gateway_transmitter_metadata& tx_md)
 {
   // Protect stream transmitter.
   std::unique_lock<std::mutex> lock(stream_transmit_mutex);
