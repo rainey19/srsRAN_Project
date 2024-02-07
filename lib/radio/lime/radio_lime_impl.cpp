@@ -287,20 +287,16 @@ radio_session_lime_impl::radio_session_lime_impl(const radio_configuration::radi
   }
 
   // Set Tx rate.
-  double actual_tx_rate_Hz = 0.0;
   if (!device.set_tx_rate(radio_config.sampling_rate_hz)) {
     fmt::print("Error: setting Tx sampling rate. {}\n", device.get_error_message());
     return;
   }
-  srsran_assert(std::isnormal(actual_tx_rate_Hz), "Actual transmit sampling rate is invalid.");
 
   // Set Rx rate.
-  double actual_rx_rate_Hz = 0.0;
   if (!device.set_rx_rate(radio_config.sampling_rate_hz)) {
     fmt::print("Error: setting Rx sampling rate. {}\n", device.get_error_message());
     return;
   }
-  srsran_assert(std::isnormal(actual_rx_rate_Hz), "Actual receive sampling rate is invalid.");
 
   // Reset timestamps.
   if ((total_rx_channel_count > 1 || total_tx_channel_count > 1) &&

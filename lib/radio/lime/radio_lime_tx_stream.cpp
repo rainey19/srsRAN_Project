@@ -64,31 +64,13 @@ bool recv_async_msg(bool is_tx, const lime::SDRDevice::StreamStats *stream_stats
 bool radio_lime_tx_stream::transmit_block(unsigned&                            nof_txd_samples,
                                          const baseband_gateway_buffer_reader& buffs,
                                          unsigned                              buffer_offset,
-                                         uint64_t                              time_spec)
+                                         lime::SDRDevice::StreamMeta&          md)
 {
-  // if (state_fsm.is_stopped()) {
-  //   return false;
-  // }
-
-  // Prepare metadata.
-  lime::SDRDevice::StreamMeta meta;
-
   // Extract number of samples.
   unsigned num_samples = buffs[0].size() - buffer_offset;
 
   // Make sure the number of channels is equal.
   report_fatal_error_if_not(buffs.get_nof_channels() == nof_channels, "Number of channels does not match.");
-
-  // Run states.
-  // if (!state_fsm.transmit_block(meta, time_spec)) {
-  //   nof_txd_samples = num_samples;
-  //   return true;
-  // }
-  // TODO: add burst flags back in!
-  // meta.flush = (md->flags & TRX_WRITE_MD_FLAG_END_OF_BURST);
-  meta.flush=false;
-  meta.timestamp=time_spec;
-  meta.useTimestamp=true;
 
   // Flatten buffers.
   static_vector<void*, RADIO_MAX_NOF_CHANNELS> buffs_flat_ptr(nof_channels);
@@ -99,12 +81,10 @@ bool radio_lime_tx_stream::transmit_block(unsigned&                            n
   const lime::complex32f_t** buffer = const_cast<const lime::complex32f_t **>((lime::complex32f_t**)buffs_flat_ptr.data());
 
   // Safe transmission.
-  return safe_execution([this, &buffer, num_samples, &meta, &nof_txd_samples]() {
-  nof_txd_samples = stream->StreamTx(chipIndex, buffer, num_samples, &meta);
+  return safe_execution([this, &buffer, num_samples, &md, &nof_txd_samples]() {
+  nof_txd_samples = stream->StreamTx(chipIndex, buffer, num_samples, &md);
   // TODO: if nof_txd_samples < 0, increment underrun flag!
   });
-
-  return true; 
 }
 
 radio_lime_tx_stream::radio_lime_tx_stream(std::shared_ptr<LimeHandle> device_,
@@ -278,21 +258,36 @@ void radio_lime_tx_stream::transmit(const baseband_gateway_buffer_reader& data, 
   // Protect stream transmitter.
   std::unique_lock<std::mutex> lock(stream_transmit_mutex);
 
-  uint64_t time_spec = tx_md.ts;
+  lime::SDRDevice::StreamMeta meta;
 
   unsigned nsamples          = data.get_nof_samples();
   unsigned txd_samples_total = 0;
 
+  // Run states.
+  // if (!state_fsm.transmit_block(meta, time_spec)) {
+  //   nof_txd_samples = num_samples;
+  //   return true;
+  // }
+  // TODO: add burst flags back in!
+  // meta.flush = (md->flags & TRX_WRITE_MD_FLAG_END_OF_BURST);
+  meta.flush=false;
+  meta.timestamp=tx_md.ts;
+  meta.useTimestamp=true;
+
+  if (state_fsm.is_stopping()) {
+    return;
+  }
+
   // Receive stream in multiple blocks.
   while (txd_samples_total < nsamples) {
     unsigned txd_samples = 0;
-    if (!transmit_block(txd_samples, data, txd_samples_total, time_spec)) {
+    if (!transmit_block(txd_samples, data, txd_samples_total, meta)) {
       logger.error("Error: failed transmitting packet. {}.", get_error_message().c_str());
       return;
     }
 
     // Save timespec for first block.
-    time_spec += txd_samples;
+    meta.timestamp += txd_samples;
 
     // Increment the total amount of received samples.
     txd_samples_total += txd_samples;

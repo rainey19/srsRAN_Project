@@ -32,9 +32,6 @@ bool radio_lime_rx_stream::receive_block(unsigned&                       nof_rxd
   // Extract number of samples.
   unsigned num_samples = data.get_nof_samples() - offset;
 
-  // Protect concurrent call of reception and stop.
-  std::unique_lock<std::mutex> lock(stream_mutex);
-
   // Ignore reception if it is not streaming.
   if (state != states::STREAMING) {
     nof_rxd_samples = num_samples;
@@ -50,10 +47,13 @@ bool radio_lime_rx_stream::receive_block(unsigned&                       nof_rxd
     buffs_flat_ptr[channel] = (void*)data[channel].subspan(offset, num_samples).data();
   }
 
-  md.timestamp = 0;
+  lime::complex32f_t** buffer = (lime::complex32f_t**)buffs_flat_ptr.data();
 
-  return safe_execution([this, buffs_flat_ptr, num_samples, &md, &nof_rxd_samples]() {
-    nof_rxd_samples = stream->StreamRx(chipIndex, (lime::complex16_t**)buffs_flat_ptr.data(), num_samples, &md);
+  // Protect concurrent call of reception and stop.
+  std::unique_lock<std::mutex> lock(stream_mutex);
+
+  return safe_execution([this, buffer, num_samples, &md, &nof_rxd_samples]() {
+    nof_rxd_samples = stream->StreamRx(chipIndex, buffer, num_samples, &md);
   });
 }
 
@@ -274,11 +274,11 @@ baseband_gateway_receiver::metadata radio_lime_rx_stream::receive(baseband_gatew
 
 bool radio_lime_rx_stream::stop()
 {
-  // Protect concurrent call of stop and reception.
-  std::unique_lock<std::mutex> lock(stream_mutex);
-
   // Transition state to stop before locking to prevent real time priority thread owning the lock constantly.
   state = states::STOP;
+
+  // Protect concurrent call of stop and reception.
+  std::unique_lock<std::mutex> lock(stream_mutex);
 
   // Try to stop the stream.
   stream->StreamStop(chipIndex);

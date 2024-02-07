@@ -35,6 +35,17 @@
 #include "radio_lime_handle.h"
 #pragma GCC diagnostic pop
 
+
+struct RxGainRow {
+    int lna;
+    int pga;
+};
+
+struct TxGainRow {
+    int main;
+    int lin;
+};
+
 namespace lime
 {
     static inline int64_t ts_to_time(int64_t fs, int64_t ts)

@@ -36,7 +36,6 @@ if (reused_bool) {                                                     \
   logger.error("Error setting {}! (returned {})", thing, reused_bool); \
 }
 
-
 /// \brief Determines whether a frequency is valid within a range.
 ///
 /// A frequency is considered valid within a range if the range clips the frequency value within 1 Hz error.
@@ -134,6 +133,7 @@ public:
     return true;
   }
 
+  // TODO
   bool get_mboard_sensor_names(std::vector<std::string>& sensors)
   {
     sensors.push_back("temp");
@@ -177,6 +177,7 @@ public:
     return true;
   }
 
+  // TODO
   bool get_time_now(uint64_t& timespec)
   {
     timespec = 0;
@@ -338,10 +339,9 @@ public:
   {
     logger.debug("Setting channel {} Tx gain to {:.2f} dB.", ch, gain);
 
-    // TODO!
-
     return safe_execution([this, ch, gain]() {
-      lime::Range range(0, 70, 0.1);
+      // WITH NEW_GAIN_BEHAVIOUR MAX GAIN VALUE IS 62
+      lime::Range range(0, 74, 0.1);
 
       if (!radio_lime_device_validate_gain_range(range, gain)) {
         on_error("Tx gain (i.e., {} dB) is out-of-range. Range is [{}, {}] dB in steps of {} dB.",
@@ -352,11 +352,13 @@ public:
         return;
       }
 
-      // TODO: not implemented in limesuite yet!
-      // LMS_SetGaindB(device->dev(), true, ch, gain);
+      // if (device->dev()->SetGain(0, lime::TRXDir::Tx, ch, lime::eGainTypes::UNKNOWN, gain)) {
+      //   on_error("Error setting TX gain!");
+      //   return;
+      // }
 
-      // lime::SDRDevice::SDRConfig& conf = device->GetDeviceConfig();
-      // conf.channel[ch].tx.gain = gain;
+      lime::SDRDevice::SDRConfig& conf = device->GetDeviceConfig();
+      conf.channel[ch].tx.gain.emplace(std::pair<lime::eGainTypes, double>(lime::eGainTypes::UNKNOWN, gain));
     });
   }
 
@@ -364,10 +366,8 @@ public:
   {
     logger.debug("Setting channel {} Rx gain to {:.2f} dB.", ch, gain);
 
-    // TODO!
-
     return safe_execution([this, ch, gain]() {
-      lime::Range range(0, 70, 0.1);
+      lime::Range range(0, 74, 0.1);
 
       if (!radio_lime_device_validate_gain_range(range, gain)) {
         on_error("Rx gain (i.e., {} dB) is out-of-range. Range is [{}, {}] dB in steps of {} dB.",
@@ -378,11 +378,13 @@ public:
         return;
       }
 
-      // TODO: not implemented in limesuite yet!
-      // LMS_SetGaindB(device->dev(), false, ch, gain);
+      // if (device->dev()->SetGain(0, lime::TRXDir::Rx, ch, lime::eGainTypes::UNKNOWN, gain)) {
+      //   on_error("Error setting TX gain!");
+      //   return;
+      // }
 
-      // lime::SDRDevice::SDRConfig& conf = device->GetDeviceConfig();
-      // conf.channel[ch].rx.gain = gain;
+      lime::SDRDevice::SDRConfig& conf = device->GetDeviceConfig();
+      conf.channel[ch].rx.gain.emplace(std::pair<lime::eGainTypes, double>(lime::eGainTypes::UNKNOWN, gain));
     });
   }
 
