@@ -56,6 +56,9 @@ LimeHandle::LimeHandle(lime::DeviceHandle& devHandle)
 
 LimeHandle::~LimeHandle()
 {
+	// NOT USING THIS FOR NOW
+	// free(GetStreamConfig().userData);
+	
 	// !!!need to close device entirely to clear PCIE data buffers between runs, otherwise FPGA gets stuck with packets from previous run and waits for their timestamps
     // might be LitePCIE Kernel driver issue, because closing individual write/read endpoints does not clear buffers
     lime::DeviceRegistry::freeDevice(_dev);

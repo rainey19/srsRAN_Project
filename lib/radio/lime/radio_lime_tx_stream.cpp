@@ -131,7 +131,8 @@ radio_lime_tx_stream::radio_lime_tx_stream(std::shared_ptr<LimeHandle> device_,
   device->GetStreamConfig().txCount       = nof_channels;
   device->GetStreamConfig().alignPhase    = (nof_channels>1) ? true : false;
   device->GetStreamConfig().hintSampleRate = srate_hz;
-  device->GetStreamConfig().userData = malloc(sizeof(lime::callback_info_t));
+   // NOT USING THIS FOR NOW
+  // device->GetStreamConfig().userData = malloc(sizeof(lime::callback_info_t));
   for (unsigned int i=0; i<nof_channels; i++)
   {
     device->GetStreamConfig().txChannels[i] = i;

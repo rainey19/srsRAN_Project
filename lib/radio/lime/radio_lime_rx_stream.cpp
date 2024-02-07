@@ -283,8 +283,6 @@ bool radio_lime_rx_stream::stop()
   // Try to stop the stream.
   stream->StreamStop(chipIndex);
 
-  free(device->GetStreamConfig().userData);
-
   return true;
 }
 

@@ -29,13 +29,6 @@
 
 #define clip(val,range) std::max(range.min, std::min(range.max, val))
 
-static bool reused_bool;
-#define error_catch(thing, function)                                   \
-reused_bool = function;                                                \
-if (reused_bool) {                                                     \
-  logger.error("Error setting {}! (returned {})", thing, reused_bool); \
-}
-
 /// \brief Determines whether a frequency is valid within a range.
 ///
 /// A frequency is considered valid within a range if the range clips the frequency value within 1 Hz error.
@@ -431,70 +424,6 @@ public:
 private:
   std::shared_ptr<LimeHandle> device = nullptr;
   srslog::basic_logger&       logger;
-
-  void set_gain_hack(std::string dev_args)
-  {
-    // Parse out optional arguments.
-    if (!dev_args.empty())
-    {
-      std::vector<std::pair<std::string, std::string>> args;
-      device->split_args(dev_args, args);
-
-      // 0-min, 15-max
-      int lna = -1;
-      // 0-min, 31-max
-      int pga = -1;
-      // 0-min, 64-max
-      int iamp = -1;
-      // 0-max, 31-min
-      int txpad = -1;
-
-      logger.debug("Configuring gains...");
-      for (auto& arg : args)
-      {
-        if (arg.first == "lna")
-          lna = std::stoul(arg.second, nullptr, 10);
-        else if (arg.first == "pga")
-          pga = std::stoul(arg.second, nullptr, 10);
-        else if (arg.first == "iamp")
-          iamp = std::stoul(arg.second, nullptr, 10);
-        else if (arg.first == "txpad")
-          txpad = std::stoul(arg.second, nullptr, 10);
-        else
-          continue;
-        logger.debug("Setting {} to {}", arg.first, arg.second);
-      }
-
-      // TODO replace 0 with chipIndex
-      lime::LMS7002M* chip = static_cast<lime::LMS7002M*>(device->dev()->GetInternalChip(0));
-      for(int mac=1; mac<=2; ++mac)
-      {
-        error_catch("LMS7_MAC",
-                    chip->Modify_SPI_Reg_bits(LMS7_MAC, mac));
-        if (lna != -1)
-        {
-          error_catch("LMS7_MAC",
-                    chip->Modify_SPI_Reg_bits(LMS7_G_LNA_RFE, lna));
-        }
-        if (pga != -1)
-        {
-          error_catch("LMS7_MAC",
-                    chip->Modify_SPI_Reg_bits(LMS7_G_PGA_RBB, pga));
-        }
-        if (iamp != -1)
-        {
-          error_catch("LMS7_MAC",
-                    chip->Modify_SPI_Reg_bits(LMS7_CG_IAMP_TBB, iamp));
-        }
-        if (txpad != -1)
-        {
-          error_catch("LMS7_MAC",
-                    chip->Modify_SPI_Reg_bits(LMS7_LOSS_MAIN_TXPAD_TRF, txpad));
-        }
-      }
-      chip->Modify_SPI_Reg_bits(LMS7_MAC, 1);
-    }
-  }
 };
 
 } // namespace srsran
