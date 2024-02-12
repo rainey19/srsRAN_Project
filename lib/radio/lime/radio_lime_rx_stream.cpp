@@ -100,6 +100,7 @@ radio_lime_rx_stream::radio_lime_rx_stream(std::shared_ptr<LimeHandle> device_,
     device->GetStreamConfig().rxChannels[i] = i;
     device->GetDeviceConfig().channel[i].rx.enabled = true;
     device->GetDeviceConfig().channel[i].rx.sampleRate = srate_Hz;
+    device->GetDeviceConfig().channel[i].rx.oversample = 2;
   }
 
   // Parse out optional arguments.
@@ -250,12 +251,10 @@ baseband_gateway_receiver::metadata radio_lime_rx_stream::receive(baseband_gatew
       return {};
     }
 
-    // TODO: try this
     // Save timespec for first block.
-    // if (rxd_samples_total == 0) {
-    //   ret.ts = md.timestamp;
-    // }
-    ret.ts = md.timestamp + rxd_samples;
+    if (rxd_samples_total == 0) {
+      ret.ts = md.timestamp;
+    }
 
     // Increase the total amount of received samples.
     rxd_samples_total += rxd_samples;

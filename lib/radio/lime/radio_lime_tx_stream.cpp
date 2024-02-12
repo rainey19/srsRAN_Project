@@ -138,6 +138,7 @@ radio_lime_tx_stream::radio_lime_tx_stream(std::shared_ptr<LimeHandle> device_,
     device->GetStreamConfig().txChannels[i] = i;
     device->GetDeviceConfig().channel[i].tx.enabled = true;
     device->GetDeviceConfig().channel[i].tx.sampleRate = srate_hz;
+    device->GetDeviceConfig().channel[i].tx.oversample = 2;
   }
 
   // Parse out optional arguments.
@@ -302,7 +303,8 @@ void radio_lime_tx_stream::stop()
 
 void radio_lime_tx_stream::wait_stop()
 {
-  state_fsm.wait_stop();
+  // Nothing to do
+  return;
 }
 
 unsigned radio_lime_tx_stream::get_buffer_size() const

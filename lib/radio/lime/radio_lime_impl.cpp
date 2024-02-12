@@ -430,7 +430,6 @@ radio_session_lime_impl::radio_session_lime_impl(const radio_configuration::radi
 
 void radio_session_lime_impl::stop()
 {
-  // warn_assert(crit != f1ap_elem_procs_o::get_crit(proc_code), __func__, __LINE__);
   // Transition state to stop.
   state = states::STOP;
 
