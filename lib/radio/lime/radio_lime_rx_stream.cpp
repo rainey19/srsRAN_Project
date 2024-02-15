@@ -39,7 +39,7 @@ bool radio_lime_rx_stream::receive_block(unsigned&                       nof_rxd
   }
 
   // Make sure the number of channels is equal.
-  report_fatal_error_if_not(data.get_nof_channels() == nof_channels, "Number of channels does not match.");
+  srsran_assert(data.get_nof_channels() == nof_channels, "Number of channels does not match.");
 
   // Flatten buffers.
   static_vector<void*, RADIO_MAX_NOF_CHANNELS> buffs_flat_ptr(nof_channels);

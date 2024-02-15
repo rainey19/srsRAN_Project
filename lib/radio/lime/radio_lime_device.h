@@ -56,12 +56,12 @@ static double toMHz(double value_Hz)
 
 namespace srsran {
 
+// TODO
 static void LogCallback(lime::SDRDevice::LogLevel lvl, const char* msg)
 {
   static srslog::basic_logger& logger = srslog::fetch_basic_logger("RF");
 
-  logger.debug(msg);
-  /*switch (lvl)
+  switch (lvl)
   {
     case lime::SDRDevice::LogLevel::CRITICAL:
     case lime::SDRDevice::LogLevel::ERROR:
@@ -78,7 +78,7 @@ static void LogCallback(lime::SDRDevice::LogLevel lvl, const char* msg)
     default:
       logger.debug(msg);
       break;
-  }*/
+  }
 }
 
 class radio_lime_device : public lime_exception_handler
@@ -239,9 +239,7 @@ public:
         return;
       }
 
-      // TODO: not implemented in limesuite yet
-      // LMS_SetSampleRateDir(device->dev(), false, rate, oversample);
-      device->GetDeviceConfig().referenceClockFreq = 0;
+      // device->GetDeviceConfig().referenceClockFreq = 0;
       device->GetDeviceConfig().channel[0].rx.sampleRate = rate;
       device->GetDeviceConfig().channel[1].rx.sampleRate = rate;
     });
@@ -262,10 +260,8 @@ public:
         return;
       }
 
-      // TODO: not implemented in limesuite yet
-      // LMS_SetSampleRateDir(device->dev(), false, rate, oversample);
-      device->GetDeviceConfig().channel[1].tx.sampleRate = rate;
       device->GetDeviceConfig().channel[0].tx.sampleRate = rate;
+      device->GetDeviceConfig().channel[1].tx.sampleRate = rate;
     });
   }
 
@@ -307,7 +303,7 @@ public:
     logger.debug("Configuring radio...");
     auto t1 = std::chrono::high_resolution_clock::now();
 
-    device->GetDeviceConfig().skipDefaults = true; // defaults are already initialized once at the startup
+    // device->GetDeviceConfig().skipDefaults = true; // defaults are already initialized once at the startup
     device->dev()->Configure(device->GetDeviceConfig(), 0);
     
     if (device->GetLMSConfPath() != "")
@@ -315,14 +311,13 @@ public:
       lime::LMS7002M* chip = static_cast<lime::LMS7002M*>(device->dev()->GetInternalChip(0));
       chip->LoadConfig(device->GetLMSConfPath().c_str());
     }
-    // else
-    // {
-    //   device->GetDeviceConfig().skipDefaults = true; // defaults are already initialized once at the startup
-    //   device->dev()->Configure(device->GetDeviceConfig(), 0);
-    // }
 
-    // Temporary gain setting hack
-    // set_gain_hack(dev_args);
+    lime::LMS7002M* chip = static_cast<lime::LMS7002M*>(device->dev()->GetInternalChip(0));
+    logger.info("Actual tx freq: {:.3f} MHz", chip->GetFrequencySX(lime::TRXDir::Tx)/1e6);
+    logger.info("Actual rx freq: {:.3f} MHz", chip->GetFrequencySX(lime::TRXDir::Rx)/1e6);
+    logger.info("Temp?: {:.1f}", chip->GetTemperature());
+    logger.info("TX rate: {:.3f} Msps", chip->GetSampleRate(lime::TRXDir::Tx, lime::LMS7002M::Channel::ChA)/1e6);
+    logger.info("RX rate: {:.3f} Msps", chip->GetSampleRate(lime::TRXDir::Rx, lime::LMS7002M::Channel::ChA)/1e6);
 
     auto t2 = std::chrono::high_resolution_clock::now();
     logger.debug("Radio configured in {}ms.", std::chrono::duration_cast<std::chrono::milliseconds>(t2-t1).count());
@@ -396,8 +391,7 @@ public:
         return;
       }
 
-      lime::SDRDevice::SDRConfig& conf = device->GetDeviceConfig();
-      conf.channel[ch].tx.centerFrequency = config.center_frequency_hz;
+      device->GetDeviceConfig().channel[ch].tx.centerFrequency = config.center_frequency_hz;
     });
   }
 
@@ -416,8 +410,7 @@ public:
         return;
       }
 
-      lime::SDRDevice::SDRConfig& conf = device->GetDeviceConfig();
-      conf.channel[ch].rx.centerFrequency = config.center_frequency_hz;
+      device->GetDeviceConfig().channel[ch].rx.centerFrequency = config.center_frequency_hz;
     });
   }
 

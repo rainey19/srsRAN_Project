@@ -9,7 +9,7 @@ ru_sdr:
   # device_args: rxpath=LNAH,txpath=BAND1,rxPacketsInBatch=1,txMaxPacketsInBatch=1,rxSamplesInPacket=1024,txSamplesInPacket=1024,lmsconfig=/home/user/repos/srsRAN_Project/configs/lms/xtrx_config.ini
   # device_args: rxcalibrate=1,txcalibrate=1,rxpath=LNAH,txpath=BAND1,rxPacketsInBatch=1,txMaxPacketsInBatch=1,rxSamplesInPacket=1024,txSamplesInPacket=1024
   # // LNAH, LNAL, LNAW
-  device_args: rxpath=LNAH,txpath=BAND1,rxPacketsInBatch=1,txMaxPacketsInBatch=1,rxSamplesInPacket=1024,txSamplesInPacket=1024,rxoversample=2,txoversample=2
+  device_args: rxpath=LNAL,txpath=BAND1,rxPacketsInBatch=1,txMaxPacketsInBatch=1,rxSamplesInPacket=1024,txSamplesInPacket=1024,rxoversample=2,txoversample=2
   # clock:
   # sync:
   srate: 30.72
@@ -17,8 +17,8 @@ ru_sdr:
   #srate: 61.44
   otw_format: sc16
   tx_gain: 74
-  rx_gain: 74
-  # time_alignment_calibration:             # Rx to Tx radio time alignment calibration in samples.
+  rx_gain: 60
+  # time_alignment_calibration: -500            # Rx to Tx radio time alignment calibration in samples.
                                           # Positive values reduce the RF transmission delay with respect
                                           # to the RF reception, while negative values increase it
 
@@ -31,19 +31,8 @@ cell_cfg:
   plmn: "00101"                                                   # PLMN broadcasted by the gNB.
   tac: 7                                                          # Tracking area code (needs to match the core configuration).
   pci: 1                                                          # Physical cell ID.
+  # pcg_p_nr_fr1: -20
 
-# test_mode: 
-#   test_ue: 
-#     rnti: 0                                     # Optional ENUM (0). Sets the C-RNTI of the UE. Supported: [0 - 65519].
-#     pdsch_active: 1                             # Optional BOOLEAN (1). Enables the PDSCH of the UE.
-#     pusch_active: 1                             # Optional BOOLEAN (1). Enables the PUSCH of the UE.
-#     cqi: 15                                     # Optional UINT (15). Sets the Channel Quality Information to be forwarded to the test UE. Supported: [1 - 15].
-#     pmi: 0                                      # Optional UINT (0). Sets the Precoder Matrix Indicator to be forwarded to test UE. Supported: [0 - 3].
-#     ri: 1                                       # Optional UINT (1). Sets the Rank Indicator to be forwarded to the test UE. Supported: [1 - 4].
-#     i_1_1: 0                                    # Optional INT (0). Sets the Precoder Matrix codebook index "i_1_1" to be forwarded to test UE, in the case of more than 2 antennas. Supported: [0 - 7].
-#     i_1_3: 0                                    # Optional INT (0). Sets the Precoder Matrix codebook index "i_1_3" to be forwarded to test UE, in the case of more than 2 antennas. Supported: [0 - 1].
-#     i_2: 0                                      # Optional INT (0). Sets the Precoder Matrix codebook index "i_2" to be forwarded to test UE, in the case of more than 2 antennas. Supported: [0 - 3].
-   
 # expert_execution:
 #   cell_affinities:
 #     - l1_dl_cpus: 4                             # Optional TEXT. Sets the CPU core(s) assigned to L1 downlink tasks. Supported: [1, 2, 3 , ..., N]. Where N is the number of total cores available. 
@@ -71,11 +60,12 @@ cell_cfg:
 #   #     enable_dl_parallelization: 1                  # Optional BOOLEAN. Sets the Open Fronthaul downlink parallelization flag. Supported: [0, 1].
 
 log:
-  filename: gnb_xtrx2.log
+  # filename: gnb_xtrx2.log
+  filename: gnb.log
   # filename: stdout
 #   all_level: warning
   # radio_level: debug
-  phy_level: debug
+  # phy_level: debug
   # mac_level: debug
 #   rlc_level: warning
 #   pdcp_level: warning
@@ -92,12 +82,12 @@ log:
 #   sec_level: warning
 #   lib_level: warning
   # broadcast_enabled: 1                  # Optional BOOL (0). Enables logging in the PHY and MAC layer of broadcast messages and all PRACH opportunities. Supported: [0, 1].
-  # phy_rx_symbols_filename: iqguy.cf32             # Optional TEXT. Print received symbols to file. Symbols will be printed if a valid path is set. Format: file path. This file can be used in the srsRAN_matlab project. 
+  # phy_rx_symbols_filename: iq.bin             # Optional TEXT. Print received symbols to file. Symbols will be printed if a valid path is set. Format: file path. This file can be used in the srsRAN_matlab project. 
   # phy_rx_symbols_port: all                # Optional TEXT. Set to a valid receive port number to dump the IQ symbols from that port only, or set to "all" to dump the IQ symbols from all UL receive ports. Only works if "phy_rx_symbols_filename" is set. Supported: [NON-NEGATIVE or all].
   # phy_rx_symbols_prach: 1               # Optional BOOLEAN (0). Set to true to dump the IQ symbols from all the PRACH ports. Only works if "phy_rx_symbols_filename" is set. Supported: [0, 1]. 
-#   # tracing_filename:                     # Optional TEXT. Set to a valid file name to enable tracing log. 
+  # tracing_filename: trc_test.log                    # Optional TEXT. Set to a valid file name to enable tracing log. 
 
-pcap: 
+pcap:
 #   ngap_filename: /tmp/gnb_ngap.pcap     # Optional TEXT (/tmp/gnb_ngap.pcap). Path for NGAP PCAPs. 
 #   ngap_enable: false                    # Optional BOOL (false). Enable/disable NGAP packet capture.
 #   e1ap_filename: /tmp/gnb_e1ap.pcap     # Optional TEXT (/tmp/gnb_e1ap.pcap). Path for E1AP PCAPs. 
