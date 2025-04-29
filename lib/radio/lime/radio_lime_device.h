@@ -27,6 +27,7 @@
 #include "radio_lime_tx_stream.h"
 #include "srsran/radio/radio_session.h"
 #include "srsran/srslog/srslog.h"
+#include "limesuiteng/LMS7002M.h"
 
 #define clip(val,range) std::max(range.min, std::min(range.max, val))
 
@@ -66,18 +67,18 @@ static void LogCallback(lime::LogLevel lvl, const std::string msg)
   {
     case lime::LogLevel::Critical:
     case lime::LogLevel::Error:
-      logger.error(msg);
+      logger.error(msg.c_str());
       break;
     case lime::LogLevel::Warning:
-      logger.warning(msg);
+      logger.warning(msg.c_str());
       break;
     case lime::LogLevel::Info:
-      logger.info(msg);
+      logger.info(msg.c_str());
       break;
     case lime::LogLevel::Verbose:
     case lime::LogLevel::Debug:
     default:
-      logger.debug(msg);
+      logger.debug(msg.c_str());
       break;
   }
 }
@@ -91,7 +92,10 @@ public:
 
   bool lime_make(const std::string& device_args)
   {
-    // Destroy any previous USRP instance
+    // TODO
+    moduleIndex = 0;
+
+    // Destroy any previous instance
     device = nullptr;
 
     // Enumerate devices
@@ -124,6 +128,15 @@ public:
     device->dev()->SetMessageLogCallback(LogCallback);
     device->dev()->Init();
 
+    // TODO: use limeplugin?
+    // lime::LimePluginContext* lime = new lime::LimePluginContext();
+    // lime->currentWorkingDirectory = std::string(hostState->path);
+    // lime->samplesFormat = DataFormat::F32;
+    // configProvider.Init(hostState);
+
+    // if (LimePlugin_Init(lime, LogCallback, &configProvider) != 0)
+    //     return False;
+
     return true;
   }
 
@@ -144,9 +157,7 @@ public:
   {
     if (sensor_name == "temp")
     {
-      // TODO replace 0 with chipIndex
-      lime::LMS7002M* chip = static_cast<lime::LMS7002M*>(device->dev()->GetInternalChip(0));
-      sensor_value = chip->GetTemperature();
+      sensor_value = device->dev()->GetTemperature(moduleIndex);
       return true;
     }
 
@@ -212,14 +223,14 @@ public:
     logger.debug("Setting PPS source to '{}' and clock source to '{}'.", sync_src, clock_src);
     return safe_execution([this, &sync_src, &clock_src]()
     {
-      if (clock_src == "external")
-      {
+      // TODO What on earth is happening in here
+      if (clock_src == "external") {
         bool is_xtrx = true;
         double ref_freq = 10e6;
-        if (is_xtrx)
-        {
+        if (is_xtrx) {
           ref_freq = 31.22e6;
         }
+        // TODO: hardcoded channel index
         device->dev()->SetClockFreq((uint8_t)lime::LMS7002M::ClockID::CLK_REFERENCE, ref_freq, 0);
       }
     });
@@ -230,16 +241,14 @@ public:
     logger.debug("Setting Rx Rate to {} MSPS.", toMHz(rate));
 
     return safe_execution([this, rate]() {
-      lime::Range range(0, 120e6, 1);
+      auto range = device->dev()->GetDescriptor().rfSOC.at(moduleIndex).samplingRateRange;
 
-      // TODO: not implemented in limesuite yet
-      // LMS_GetSampleRateRange(device->dev(), false, &range);
       if (!radio_lime_device_validate_freq_range(range, rate)) {
         on_error("Rx Rate {} MHz is invalid. The nearest valid value is {}.", toMHz(rate), toMHz(clip(rate, range)));
         return;
       }
 
-      // device->GetDeviceConfig().referenceClockFreq = 0;
+      // TODO: hardcoded channels
       device->GetDeviceConfig().channel[0].rx.sampleRate = rate;
       device->GetDeviceConfig().channel[1].rx.sampleRate = rate;
     });
@@ -250,16 +259,14 @@ public:
     logger.debug("Setting Tx Rate to {} MSPS.", toMHz(rate));
 
     return safe_execution([this, rate]() {
-      lime::Range range(0, 120e6, 1);
-
-      // TODO: not implemented in limesuite yet
-      // LMS_GetSampleRateRange(device->dev(), true, &range);
+      auto range = device->dev()->GetDescriptor().rfSOC.at(moduleIndex).samplingRateRange;
 
       if (!radio_lime_device_validate_freq_range(range, rate)) {
         on_error("Tx Rate {} MHz is invalid. The nearest valid value is {}.", toMHz(rate), toMHz(clip(rate, range)));
         return;
       }
 
+      // TODO: hardcoded channels
       device->GetDeviceConfig().channel[0].tx.sampleRate = rate;
       device->GetDeviceConfig().channel[1].tx.sampleRate = rate;
     });
@@ -300,25 +307,23 @@ public:
 
   void execute_config(std::string dev_args)
   {
+    int channel = 0; // TODO
+
     logger.debug("Configuring radio...");
     auto t1 = std::chrono::high_resolution_clock::now();
 
     // device->GetDeviceConfig().skipDefaults = true; // defaults are already initialized once at the startup
     device->dev()->Configure(device->GetDeviceConfig(), 0);
     
-    if (device->GetLMSConfPath() != "")
-    {
-      lime::LMS7002M* chip = static_cast<lime::LMS7002M*>(device->dev()->GetInternalChip(0));
-      chip->LoadConfig(device->GetLMSConfPath().c_str());
+    if (device->GetLMSConfPath() != "") {
+      device->dev()->LoadConfig(moduleIndex, device->GetLMSConfPath());
     }
 
-    lime::LMS7002M* chip = static_cast<lime::LMS7002M*>(device->dev()->GetInternalChip(0));
-    logger.info("Actual tx freq: {:.3f} MHz", chip->GetFrequencySX(lime::TRXDir::Tx)/1e6);
-    logger.info("Actual rx freq: {:.3f} MHz", chip->GetFrequencySX(lime::TRXDir::Rx)/1e6);
-    logger.info("Temp?: {:.1f}", chip->GetTemperature());
-    logger.info("TX rate: {:.3f} Msps", chip->GetSampleRate(lime::TRXDir::Tx, lime::LMS7002M::Channel::ChA)/1e6);
-    logger.info("RX rate: {:.3f} Msps", chip->GetSampleRate(lime::TRXDir::Rx, lime::LMS7002M::Channel::ChA)/1e6);
-
+    logger.info("Actual tx freq: {:.3f} MHz", device->dev()->GetFrequency(moduleIndex, lime::TRXDir::Tx, channel) / 1e6);
+    logger.info("Actual rx freq: {:.3f} MHz", device->dev()->GetFrequency(moduleIndex, lime::TRXDir::Rx, channel) / 1e6);
+    logger.info("Temp?: {:.1f}", device->dev()->GetTemperature(moduleIndex));
+    logger.info("TX rate: {:.3f} Msps", device->dev()->GetSampleRate(moduleIndex, lime::TRXDir::Tx, channel, nullptr) / 1e6);
+    logger.info("RX rate: {:.3f} Msps", device->dev()->GetSampleRate(moduleIndex, lime::TRXDir::Rx, channel, nullptr) / 1e6);
     auto t2 = std::chrono::high_resolution_clock::now();
     logger.debug("Radio configured in {}ms.", std::chrono::duration_cast<std::chrono::milliseconds>(t2-t1).count());
   }
@@ -417,6 +422,7 @@ public:
 private:
   std::shared_ptr<LimeHandle> device = nullptr;
   srslog::basic_logger&       logger;
+  int                         moduleIndex;
 };
 
 } // namespace srsran

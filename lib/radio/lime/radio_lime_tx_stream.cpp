@@ -21,6 +21,7 @@
  */
 
 #include "radio_lime_tx_stream.h"
+#include "srsran/srslog/srslog.h"
 
 using namespace srsran;
 
@@ -111,14 +112,14 @@ radio_lime_tx_stream::radio_lime_tx_stream(std::shared_ptr<LimeHandle> device_,
   // }
 
   // Build stream arguments.
-  lime::SDRDevice::StreamConfig::DataFormat wire_format;
+  lime::DataFormat wire_format;
   switch (description.otw_format) {
     case radio_configuration::over_the_wire_format::DEFAULT:
     case radio_configuration::over_the_wire_format::SC16:
-      wire_format = lime::SDRDevice::StreamConfig::DataFormat::I16;
+      wire_format = lime::DataFormat::I16;
       break;
     case radio_configuration::over_the_wire_format::SC12:
-      wire_format = lime::SDRDevice::StreamConfig::DataFormat::I12;
+      wire_format = lime::DataFormat::I12;
       break;
     case radio_configuration::over_the_wire_format::SC8:
     default:
@@ -127,8 +128,7 @@ radio_lime_tx_stream::radio_lime_tx_stream(std::shared_ptr<LimeHandle> device_,
   }
 
   device->GetStreamConfig().linkFormat    = wire_format;
-  device->GetStreamConfig().format        = lime::SDRDevice::StreamConfig::DataFormat::F32;
-  device->GetStreamConfig().txCount       = nof_channels;
+  device->GetStreamConfig().format        = lime::DataFormat::F32;
   device->GetStreamConfig().alignPhase    = (nof_channels>1) ? true : false;
   device->GetStreamConfig().hintSampleRate = srate_hz;
    // NOT USING THIS FOR NOW
