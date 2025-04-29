@@ -1,0 +1,106 @@
+amf:
+  addr: 172.22.0.10
+  bind_addr: 142.168.1.144
+
+ru_sdr:
+  device_driver: lime
+  # nrbandwidth, (rx/tx)lpf, (rx/tx)oversample, (rx/tx)gfir, (rx/tx)calibrate, (rx/tx)testSignal, (rx/tx)pathint, (rx/tx)path
+  # usepoll, rxPacketsInBatch, txMaxPacketsInBatch, rxSamplesInPacket, txSamplesInPacket, lmsconfig
+  # device_args: rxpath=LNAH,txpath=BAND1,rxPacketsInBatch=1,txMaxPacketsInBatch=1,rxSamplesInPacket=1024,txSamplesInPacket=1024,lmsconfig=/home/user/repos/srsRAN_Project/configs/lms/xtrx_config.ini
+  # device_args: rxcalibrate=1,txcalibrate=1,rxpath=LNAH,txpath=BAND1,rxPacketsInBatch=1,txMaxPacketsInBatch=1,rxSamplesInPacket=1024,txSamplesInPacket=1024
+  # // LNAH, LNAL, LNAW
+  device_args: rxpath=LNAL,txpath=BAND1,rxPacketsInBatch=1,txMaxPacketsInBatch=1,rxSamplesInPacket=1024,txSamplesInPacket=1024,rxoversample=2,txoversample=2
+  # clock:
+  # sync:
+  srate: 30.72
+  # srate: 46.08
+  #srate: 61.44
+  otw_format: sc16
+  tx_gain: 74
+  rx_gain: 60
+  # time_alignment_calibration: -500            # Rx to Tx radio time alignment calibration in samples.
+                                          # Positive values reduce the RF transmission delay with respect
+                                          # to the RF reception, while negative values increase it
+
+cell_cfg:
+  dl_arfcn: 518670                                                # ARFCN of the downlink carrier (center frequency).
+  band: 41                                                        # The NR band.
+  channel_bandwidth_MHz: 20                                       # Bandwith in MHz. Number of PRBs will be automatically derived.
+  # channel_bandwidth_MHz: 40
+  common_scs: 30                                                  # Subcarrier spacing in kHz used for data.
+  plmn: "00101"                                                   # PLMN broadcasted by the gNB.
+  tac: 7                                                          # Tracking area code (needs to match the core configuration).
+  pci: 1                                                          # Physical cell ID.
+  # pcg_p_nr_fr1: -20
+
+# expert_execution:
+#   cell_affinities:
+#     - l1_dl_cpus: 4                             # Optional TEXT. Sets the CPU core(s) assigned to L1 downlink tasks. Supported: [1, 2, 3 , ..., N]. Where N is the number of total cores available. 
+#       # l1_dl_pinning: mask                       # Optional TEXT. Sets the policy used for assigning CPU cores to L1 downlink tasks.
+#       l1_ul_cpus: 5                             # Optional TEXT. Sets the CPU core(s) assigned to L1 uplink tasks. Supported: [1, 2, 3 , ..., N].
+#       # l1_ul_pinning: mask                       # Optional TEXT. Sets the policy used for assigning CPU cores to L1 uplink tasks. 
+#       l2_cell_cpus: 6                           # Optional TEXT. Sets the CPU core(s) assigned to L2 cells tasks. Supported: [1, 2, 3 , ..., N].
+#       # l2_cell_pinning: mask                     # Optional TEXT. Sets the policy used for assigning CPU cores to L2 cell tasks.
+#       ru_cpus: 7                                # Optional TEXT. Sets the CPU core(s) used for the Radio Unit tasks. Supported: [1, 2, 3 , ..., N].
+#       # ru_pinning: mask                          # Optional TEXT. Sets the policy used for assigning CPU cores to Radio Unity tasks.
+#   affinities: 
+#     low_priority_cpus: 0,1,2,3                    # Optional TEXT. Sets the CPU core(s) assigned to low priority tasks. Supported: [1, 2, 3 , ..., N].
+#     # low_priority_pinning: mask                  # Optional TEXT. Sets the policy used for assigning CPU cores to low priority tasks.
+#     # ioslated_cpus:                              # Optional TEXT. Sets the CPU core(s) isolated for the gNB application. Supported: [1, 2, 3 , ..., N].
+
+#   # threads:
+#   #   upper_phy: 
+#   #     pdsch_processor_type: auto                    # Optional TEXT (auto). Sets the PDSCH processor type. Supported: [auto, generic, concurrent, lite].
+#   #     nof_pusch_decoder_threads: 1                          # Optional UINT (1). Sets the number of threads used to encode PUSCH.
+#   #     nof_ul_threads: 1                             # Optional UINT (1). Sets the number of upprt PHY threads to proccess uplink.
+#   #     nof_dl_threads: 2                             # Optional UINT (1). Sets the number of upprt PHY threads to proccess downlink.  
+#   #   lower_phy:
+#   #     execution_profile:                            # Optional TEXT. Sets the lower physical layer executor profile. Supported: [single, dual, quad].
+#   #   ofh: 
+#   #     enable_dl_parallelization: 1                  # Optional BOOLEAN. Sets the Open Fronthaul downlink parallelization flag. Supported: [0, 1].
+
+log:
+  # filename: gnb_xtrx2.log
+  filename: gnb.log
+  # filename: stdout
+#   all_level: warning
+  # radio_level: debug
+  # phy_level: debug
+  # mac_level: debug
+#   rlc_level: warning
+#   pdcp_level: warning
+#   rrc_level: warning
+#   sdap_level: warning
+#   ngap_level: warning
+#   gtpu_level: warning
+#   fapi_level: warning
+#   ofh_level: warning
+#   f1ap_level: warning
+#   f1u_level: warning
+#   du_level: warning
+#   cu_level: warning
+#   sec_level: warning
+#   lib_level: warning
+  # broadcast_enabled: 1                  # Optional BOOL (0). Enables logging in the PHY and MAC layer of broadcast messages and all PRACH opportunities. Supported: [0, 1].
+  # phy_rx_symbols_filename: iq.bin             # Optional TEXT. Print received symbols to file. Symbols will be printed if a valid path is set. Format: file path. This file can be used in the srsRAN_matlab project. 
+  # phy_rx_symbols_port: all                # Optional TEXT. Set to a valid receive port number to dump the IQ symbols from that port only, or set to "all" to dump the IQ symbols from all UL receive ports. Only works if "phy_rx_symbols_filename" is set. Supported: [NON-NEGATIVE or all].
+  # phy_rx_symbols_prach: 1               # Optional BOOLEAN (0). Set to true to dump the IQ symbols from all the PRACH ports. Only works if "phy_rx_symbols_filename" is set. Supported: [0, 1]. 
+  # tracing_filename: trc_test.log                    # Optional TEXT. Set to a valid file name to enable tracing log. 
+
+pcap:
+#   ngap_filename: /tmp/gnb_ngap.pcap     # Optional TEXT (/tmp/gnb_ngap.pcap). Path for NGAP PCAPs. 
+#   ngap_enable: false                    # Optional BOOL (false). Enable/disable NGAP packet capture.
+#   e1ap_filename: /tmp/gnb_e1ap.pcap     # Optional TEXT (/tmp/gnb_e1ap.pcap). Path for E1AP PCAPs. 
+#   e1ap_enable: false                    # Optional BOOL (false). Enable/disable E1AP packet capture.
+#   f1ap_filename: /tmp/gnb_f1ap.pcap     # Optional TEXT (/tmp/gnb_f1ap.pcap). Path for F1AP PCAPs. 
+#   f1ap_enable: false                    # Optional BOOL (false). Enable/disable F1AP packet capture.
+  # rlc_filename: /tmp/gnb_rlc.pcap       # Optional TEXT (tmp/gnb_rlc.pcap). Path for RLC PCAPs. 
+  # rlc_rb_type: all                      # Optional TEXT. Sets the RLC PCAP RB type. Supported: [all, srb, drb].
+  # rlc_enable: true                      # Optional BOOL (false). Enable/disable RLC packet capture.  
+  # mac_filename: /tmp/gnb_mac.pcap       # Optional TEXT (/tmp/gnb_mac.pcap). Path for MAC PCAPs. 
+  # mac_type: udp                         # Optional TEXT (udp). Sets the MAC PCAP pcap type. Supported: [DLT or UDP].
+  # mac_enable: true                      # Optional BOOL (false). Enable/disable MAC packet capture.
+#   e2ap_filename: /tmp/gnb_e2ap.pcap     # Optional TEXT (/tmp/gnb_e2ap.pcap). Path for E2AP PCAPs. 
+#   e2ap_enable: false                    # Optional BOOL (false). Enable/disable E2AP packet capture.
+#   gtpu_filename: /tmp/gnb_gtpu.pcap     # Optional TEXT (/tmp/gnb_gtpu.pcap). Path for GTPU PCAPs. 
+#   gtpu_enable: false                    # Optional BOOL (false). Enable/disable GTPU packet capture.
