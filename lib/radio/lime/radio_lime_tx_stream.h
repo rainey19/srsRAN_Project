@@ -1,6 +1,6 @@
 /*
  *
- * Copyright 2021-2024 Software Radio Systems Limited
+ * Copyright 2021-2025 Software Radio Systems Limited
  *
  * This file is part of srsRAN.
  *
@@ -42,7 +42,7 @@ private:
   /// Receive asynchronous message timeout in seconds.
   static constexpr double RECV_ASYNC_MSG_TIMEOUT_S = 0.001;
   /// Transmit timeout in seconds.
-  static constexpr double TRANSMIT_TIMEOUT_S = 0.001;
+  static constexpr long long TRANSMIT_TIMEOUT_US = 1000;
 
   /// Indicates the stream identification for notifications.
   unsigned stream_id;
@@ -63,8 +63,6 @@ private:
   unsigned nof_channels;
   /// Indicates the current internal state.
   radio_lime_tx_stream_fsm state_fsm;
-  /// Handle to logger object
-  srslog::basic_logger& logger;
   /// Index of the RFIC (for SDRs with multiple chipsets such as X3 or X8)
   uint8_t chipIndex;
 
@@ -77,7 +75,7 @@ private:
   bool transmit_block(unsigned&                             nof_txd_samples,
                       const baseband_gateway_buffer_reader& data,
                       unsigned                              offset,
-                      lime::SDRDevice::StreamMeta&          md);
+                      lime::StreamMeta&                     md);
 
 public:
   /// Describes the necessary parameters to create a Lime transmit stream.

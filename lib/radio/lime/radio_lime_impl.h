@@ -1,6 +1,6 @@
 /*
  *
- * Copyright 2021-2024 Software Radio Systems Limited
+ * Copyright 2021-2025 Software Radio Systems Limited
  *
  * This file is part of srsRAN.
  *
@@ -37,14 +37,12 @@ class radio_session_lime_impl : public radio_session, private radio_management_p
 private:
   /// Wait at most 1s for external clock locking.
   static constexpr int CLOCK_TIMEOUT_MS = 1000;
-  /// Defines the start stream command delay in seconds.
-  static constexpr double START_STREAM_DELAY_S = 0.1;
   /// Enumerates possible LIME session states.
-  enum class states { UNINITIALIZED, SUCCESSFUL_INIT, STOP };
+  enum class states { UNINITIALIZED = 0, SUCCESSFUL_INIT, STOP };
   /// Maps ports to stream and channel indexes.
   using port_to_stream_channel = std::pair<unsigned, unsigned>;
   /// Indicates the current state.
-  std::atomic<states> state;
+  std::atomic<states> state = {states::UNINITIALIZED};
   /// Wraps the LIME device functions.
   radio_lime_device device;
   /// Indexes the transmitter port indexes into stream and channel index as first and second.
@@ -53,7 +51,7 @@ private:
   static_vector<port_to_stream_channel, RADIO_MAX_NOF_PORTS> rx_port_map;
   /// Baseband gateways.
   std::vector<std::unique_ptr<radio_lime_baseband_gateway>> bb_gateways;
-  double                                                    sampling_rate_hz;
+  double                                                    actual_sampling_rate_Hz;
   /// Protects the stream start.
   std::mutex stream_start_mutex;
   /// Indicates if the reception streams require start.
@@ -142,11 +140,12 @@ public:
   bool set_rx_gain(unsigned port_idx, double gain_dB) override { return set_rx_gain_unprotected(port_idx, gain_dB); }
 };
 
+/// Factory for lime radio session.
 class radio_factory_lime_impl : public radio_factory
 {
 public:
   // See interface for documentation.
-  const radio_configuration::validator& get_configuration_validator() override { return config_validator; };
+  const radio_configuration::validator& get_configuration_validator() override { return config_validator; }
 
   // See interface for documentation.
   std::unique_ptr<radio_session> create(const radio_configuration::radio& config,

@@ -1,6 +1,6 @@
 /*
  *
- * Copyright 2021-2024 Software Radio Systems Limited
+ * Copyright 2021-2025 Software Radio Systems Limited
  *
  * This file is part of srsRAN.
  *
@@ -23,7 +23,7 @@
 #include "radio_lime_impl.h"
 #include "radio_lime_device.h"
 #include <thread>
-
+#include <uhd/utils/thread_priority.h>
 
 using namespace srsran;
 
@@ -63,8 +63,7 @@ bool radio_session_lime_impl::set_time_to_gps_time()
 
 bool radio_session_lime_impl::wait_sensor_locked(const std::string& sensor_name, bool is_mboard, int timeout)
 {
-  bool is_locked = false;
-  auto end_time  = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeout);
+  auto end_time = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeout);
 
   // Get sensor list
   std::vector<std::string> sensors;
@@ -90,6 +89,7 @@ bool radio_session_lime_impl::wait_sensor_locked(const std::string& sensor_name,
 
   do {
     // Get actual sensor value
+    bool is_locked = false;
     if (is_mboard) {
       if (!device.get_sensor(sensor_name, is_locked)) {
         fmt::print("Error: reading mboard sensor {}. {}.\n", sensor_name, device.get_error_message());
@@ -102,11 +102,16 @@ bool radio_session_lime_impl::wait_sensor_locked(const std::string& sensor_name,
       }
     }
 
-    // Read value and wait
-    std::this_thread::sleep_for(std::chrono::milliseconds(1));
-  } while (not is_locked and std::chrono::steady_clock::now() < end_time);
+    // Return true if the sensor is locked.
+    if (is_locked) {
+      return true;
+    }
 
-  return is_locked;
+    // Sleep some time before trying it again.
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+  } while (std::chrono::steady_clock::now() < end_time);
+
+  return false;
 }
 
 bool radio_session_lime_impl::set_tx_gain_unprotected(unsigned port_idx, double gain_dB)

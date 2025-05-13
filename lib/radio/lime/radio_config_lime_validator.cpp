@@ -1,6 +1,6 @@
 /*
  *
- * Copyright 2021-2024 Software Radio Systems Limited
+ * Copyright 2021-2025 Software Radio Systems Limited
  *
  * This file is part of srsRAN.
  *
@@ -22,6 +22,7 @@
 
 #include "radio_config_lime_validator.h"
 #include "radio_lime_sdrdevice.h"
+#include "srsran/srslog/srslog.h"
 #include "fmt/format.h"
 #include <regex>
 #include <set>
@@ -147,37 +148,19 @@ static bool validate_otw_format(radio_configuration::over_the_wire_format otw_fo
   return true;
 }
 
-static bool validate_log_level(const std::string& log_level)
-{
-  // Converts to a logger level.
-  srslog::basic_levels level = srslog::str_to_basic_level(log_level);
-
-  // Convert the logger level back to a string.
-  std::string actual_log_level = srslog::basic_level_to_string(level);
-
-  // Check if the strings are equal without considering the case.
-  bool are_equal = std::equal(
-      log_level.begin(), log_level.end(), actual_log_level.begin(), actual_log_level.end(), [](char a, char b) {
-        return std::tolower(a) == std::tolower(b);
-      });
-
-  // The log level is not valid if the strings are different.
-  if (!are_equal) {
-    fmt::print("Log level {} does not correspond to an actual logger level.\n", log_level);
-    return false;
-  }
-
-  return true;
-}
-
 bool radio_config_lime_config_validator::is_configuration_valid(const radio_configuration::radio& config) const
 {
   if (!validate_clock_sources(config.clock)) {
     return false;
   }
 
+  if (config.tx_streams.size() != config.rx_streams.size()) {
+    fmt::print("Transmit and receive number of streams must be equal.\n");
+    return false;
+  }
+
   if (config.tx_streams.empty()) {
-    fmt::print("At least one transmit stream must be available.\n");
+    fmt::print("At least one transmit and one receive stream must be configured.\n");
     return false;
   }
 
@@ -185,11 +168,6 @@ bool radio_config_lime_config_validator::is_configuration_valid(const radio_conf
     if (!validate_stream(tx_stream, true)) {
       return false;
     }
-  }
-
-  if (config.rx_streams.empty()) {
-    fmt::print("At least one receive stream must be available.\n");
-    return false;
   }
 
   for (const radio_configuration::stream& rx_stream : config.rx_streams) {
@@ -203,10 +181,6 @@ bool radio_config_lime_config_validator::is_configuration_valid(const radio_conf
   }
 
   if (!validate_otw_format(config.otw_format)) {
-    return false;
-  }
-
-  if (!validate_log_level(config.log_level)) {
     return false;
   }
 

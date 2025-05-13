@@ -1,6 +1,6 @@
 /*
  *
- * Copyright 2021-2024 Software Radio Systems Limited
+ * Copyright 2021-2025 Software Radio Systems Limited
  *
  * This file is part of srsRAN.
  *
@@ -181,14 +181,45 @@ public:
   {
     return true;
   }
+  // TODO
+  bool get_rx_antennas(std::vector<std::string>& rx_antennas, unsigned channel_id)
+  {
+    return safe_execution([this, &rx_antennas, &channel_id]() { rx_antennas = usrp->get_rx_antennas(channel_id); });
+  }
+  // TODO
+  bool set_rx_antenna(const std::string& rx_antenna, unsigned channel_id)
+  {
+    return safe_execution([this, &rx_antenna, &channel_id]() { usrp->set_rx_antenna(rx_antenna, channel_id); });
+  }
+  // TODO
+  bool get_selected_tx_antenna(std::string& tx_antenna, unsigned channel_id)
+  {
+    return safe_execution([this, &tx_antenna, &channel_id]() { tx_antenna = usrp->get_tx_antenna(channel_id); });
+  }
+  // TODO
+  bool set_automatic_master_clock_rate(double srate_Hz)
+  {
+    // Skip automatic master clock rate if it is not available.
+    if (!automatic_master_clock_rate) {
+      return true;
+    }
 
+    return safe_execution([this, &srate_Hz]() {
+      // Get range of valid master clock rates.
+      uhd::meta_range_t range = usrp->get_master_clock_rate_range();
+
+      // Select the nearest valid master clock rate.
+      double mcr_Hz = range.clip(srate_Hz);
+
+      usrp->set_master_clock_rate(mcr_Hz);
+    });
+  }
   // TODO
   bool get_time_now(uint64_t& timespec)
   {
     timespec = 0;
     return true;
   }
-
   // TODO
   bool set_sync_source(const radio_configuration::clock_sources& config)
   {
@@ -233,6 +264,10 @@ public:
         // TODO: hardcoded channel index
         device->dev()->SetClockFreq((uint8_t)lime::LMS7002M::ClockID::CLK_REFERENCE, ref_freq, 0);
       }
+
+
+
+      device->GetStreamConfig().extraConfig.waitPPS = true;
     });
   }
 
@@ -305,6 +340,7 @@ public:
     return nullptr;
   }
 
+  // TODO: IS THIS USED?
   void execute_config(std::string dev_args)
   {
     int channel = 0; // TODO

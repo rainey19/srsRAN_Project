@@ -1,6 +1,6 @@
 /*
  *
- * Copyright 2021-2024 Software Radio Systems Limited
+ * Copyright 2021-2025 Software Radio Systems Limited
  *
  * This file is part of srsRAN.
  *
@@ -32,10 +32,7 @@ namespace srsran {
 ///
 /// This validator validates that parameters values are generally valid, for example frequencies are valid numbers and
 /// positive or stream arguments follow a certain pattern. However, it does not validate whether the actual values are
-/// supported by the LIME device.
-///
-/// It is up to the user to select parameters within ranges. These can be consulted using the LIME application \e
-/// lime_usrp_probe.
+/// supported by the lime device.
 class radio_config_lime_config_validator : public radio_configuration::validator
 {
 public:

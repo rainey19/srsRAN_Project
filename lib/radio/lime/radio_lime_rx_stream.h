@@ -1,6 +1,6 @@
 /*
  *
- * Copyright 2021-2024 Software Radio Systems Limited
+ * Copyright 2021-2025 Software Radio Systems Limited
  *
  * This file is part of srsRAN.
  *
@@ -60,8 +60,6 @@ private:
   unsigned nof_channels;
   /// Protects stream from concurrent receive and stop.
   std::mutex stream_mutex;
-  /// Handle to logger object
-  srslog::basic_logger& logger;
   /// Index of the RFIC (for SDRs with multiple chipsets such as X3 or X8)
   uint8_t chipIndex;
 
@@ -74,7 +72,7 @@ private:
   bool receive_block(unsigned&                       nof_rxd_samples,
                      baseband_gateway_buffer_writer& buffs,
                      unsigned                        buffer_offset,
-                     lime::SDRDevice::StreamMeta&    md);
+                     lime::StreamMeta&               md);
 
 public:
   /// Describes the necessary parameters to create a Lime transmit stream.

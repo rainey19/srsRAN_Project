@@ -1,6 +1,6 @@
 /*
  *
- * Copyright 2021-2024 Software Radio Systems Limited
+ * Copyright 2021-2025 Software Radio Systems Limited
  *
  * This file is part of srsRAN.
  *
@@ -33,11 +33,13 @@
 #pragma GCC diagnostic pop
 
 
+// TODO: remove
 struct RxGainRow {
     int lna;
     int pga;
 };
 
+// TODO: remove
 struct TxGainRow {
     int main;
     int lin;

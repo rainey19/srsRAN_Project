@@ -1,6 +1,6 @@
 /*
  *
- * Copyright 2021-2024 Software Radio Systems Limited
+ * Copyright 2021-2025 Software Radio Systems Limited
  *
  * This file is part of srsRAN.
  *
@@ -21,11 +21,12 @@
  */
 
 #include "radio_lime_tx_stream.h"
-#include "srsran/srslog/srslog.h"
+#include "srsran/gateways/baseband/buffer/baseband_gateway_buffer_reader_view.h"
+#include "srsran/srsvec/zero.h"
 
 using namespace srsran;
 
-bool recv_async_msg(bool is_tx, const lime::SDRDevice::StreamStats *stream_stats, void* user_data)
+bool recv_async_msg(bool is_tx, const lime::StreamStats *stream_stats, void* user_data)
 {
   lime::callback_info_t* cbinf = (lime::callback_info_t*)user_data;
   radio_notification_handler* notifier = (radio_notification_handler*)cbinf->notifier;
@@ -40,19 +41,16 @@ bool recv_async_msg(bool is_tx, const lime::SDRDevice::StreamStats *stream_stats
                                                                             : (radio_notification_handler::event_source::RECEIVE);
   event_description.type                                          = radio_notification_handler::event_type::UNDEFINED;
 
-  if (stream_stats->underrun)
-  {
+  if (stream_stats->underrun) {
     event_description.type = radio_notification_handler::event_type::UNDERFLOW;
     state_fsm->async_event_late_underflow(stream_stats->timestamp);
   }
 
-  if (stream_stats->overrun || stream_stats->loss)
-  {
+  if (stream_stats->overrun || stream_stats->loss) {
     event_description.type = radio_notification_handler::event_type::OTHER;
   }
 
-  if (stream_stats->late)
-  {
+  if (stream_stats->late) {
     event_description.type = radio_notification_handler::event_type::LATE;
     state_fsm->async_event_late_underflow(stream_stats->timestamp);
   }
@@ -65,7 +63,7 @@ bool recv_async_msg(bool is_tx, const lime::SDRDevice::StreamStats *stream_stats
 bool radio_lime_tx_stream::transmit_block(unsigned&                            nof_txd_samples,
                                          const baseband_gateway_buffer_reader& buffs,
                                          unsigned                              buffer_offset,
-                                         lime::SDRDevice::StreamMeta&          md)
+                                         lime::StreamMeta&                     md)
 {
   // Extract number of samples.
   unsigned num_samples = buffs[0].size() - buffer_offset;
@@ -79,12 +77,12 @@ bool radio_lime_tx_stream::transmit_block(unsigned&                            n
     buffs_flat_ptr[channel] = (void**)buffs[channel].subspan(buffer_offset, num_samples).data();
   }
 
-  const lime::complex32f_t** buffer = const_cast<const lime::complex32f_t **>((lime::complex32f_t**)buffs_flat_ptr.data());
+  // Make lime buffers.
+  const lime::complex32f_t** buffs_cpp = const_cast<const lime::complex32f_t **>((lime::complex32f_t**)buffs_flat_ptr.data());
 
   // Safe transmission.
-  return safe_execution([this, &buffer, num_samples, &md, &nof_txd_samples]() {
-  nof_txd_samples = stream->StreamTx(chipIndex, buffer, num_samples, &md);
-  // TODO: if nof_txd_samples < 0, increment underrun flag!
+  return safe_execution([this, &buffs_cpp, num_samples, &md, &nof_txd_samples]() {
+    nof_txd_samples = stream->StreamTx(chipIndex, buffs_cpp, num_samples, &md, std::__1::chrono::microseconds{TRANSMIT_TIMEOUT_US});
   });
 }
 
@@ -99,7 +97,6 @@ radio_lime_tx_stream::radio_lime_tx_stream(std::shared_ptr<LimeHandle> device_,
   device(device_),
   srate_hz(description.srate_hz),
   nof_channels(description.ports.size()),
-  logger(srslog::fetch_basic_logger("RF")),
   chipIndex(0)
 {
   srsran_assert(std::isnormal(srate_hz) && (srate_hz > 0.0), "Invalid sampling rate {}.", srate_hz);
@@ -107,7 +104,7 @@ radio_lime_tx_stream::radio_lime_tx_stream(std::shared_ptr<LimeHandle> device_,
   // int availableTxChannels = LMS_GetNumChannels(stream, lime::Dir::Tx);
   // if (availableTxChannels < nof_channels)
   // {
-  //   logger.error("Device supports only {} Tx channels, required {}.", availableTxChannels, nof_channels);
+  //   printf("Device supports only %d Tx channels, required %d.\n", availableTxChannels, nof_channels);
   //   return;
   // }
 
@@ -123,7 +120,7 @@ radio_lime_tx_stream::radio_lime_tx_stream(std::shared_ptr<LimeHandle> device_,
       break;
     case radio_configuration::over_the_wire_format::SC8:
     default:
-      logger.error("Failed to create transmit stream {}. invalid OTW format!", stream_id);
+      printf("Failed to create transmit stream %d. Invalid OTW format!\n", stream_id);
       return;
   }
 
@@ -135,11 +132,28 @@ radio_lime_tx_stream::radio_lime_tx_stream(std::shared_ptr<LimeHandle> device_,
   // device->GetStreamConfig().userData = malloc(sizeof(lime::callback_info_t));
   for (unsigned int i=0; i<nof_channels; i++)
   {
+    device->GetStreamConfig().channels.emplace
     device->GetStreamConfig().txChannels[i] = i;
     device->GetDeviceConfig().channel[i].tx.enabled = true;
     device->GetDeviceConfig().channel[i].tx.sampleRate = srate_hz;
     device->GetDeviceConfig().channel[i].tx.oversample = 2;
   }
+
+  device->GetStreamConfig().channels.at(lime::TRXDir::Tx).clear();
+  int max_ant = device->dev()->GetDescriptor().rfSOC[chipIndex].channelCount;
+  if (nof_channels > max_ant) {
+    printf("Failed to create transmit stream %d. Invalid number of antennas (max %d, asked for %d)\n", stream_id, max_ant, nof_channels);
+    return;
+  }
+
+  for (int j = 0; j < deviceChannelCount; ++j) {
+    if (tx_require > 0) {
+      device->GetStreamConfig().channels.at(TRXDir::Tx).push_back(j);
+      --tx_require;
+    }
+  }
+
+
 
   // Parse out optional arguments.
   if (!description.args.empty())
@@ -147,7 +161,7 @@ radio_lime_tx_stream::radio_lime_tx_stream(std::shared_ptr<LimeHandle> device_,
     std::vector<std::pair<std::string, std::string>> args;
     if (!device->split_args(description.args, args))
     {
-      logger.error("Failed to create transmit stream {}. Could not parse args!", stream_id);
+      printf("Failed to create transmit stream %d. Could not parse args!\n", stream_id);
       return;
     }
 
@@ -205,7 +219,7 @@ radio_lime_tx_stream::radio_lime_tx_stream(std::shared_ptr<LimeHandle> device_,
         {
           if (strcasecmp(paths[j].c_str(), arg.second.c_str()) == 0)
           {
-            logger.debug("TX path: {} ({})", arg.second.c_str(), j);
+            printf("TX path: %s (%d)\n", arg.second.c_str(), j);
             for (unsigned int i=0; i<nof_channels; i++)
               device->GetDeviceConfig().channel[i].tx.path = j;
             match = true;
@@ -214,7 +228,7 @@ radio_lime_tx_stream::radio_lime_tx_stream(std::shared_ptr<LimeHandle> device_,
         }
 
         if (!match)
-          logger.error("TX path {} not valid!", arg.second.c_str());
+          printf("TX path %s not valid!\n", arg.second.c_str());
       }
       else if (arg.first == "txMaxPacketsInBatch")
       {
@@ -239,7 +253,7 @@ radio_lime_tx_stream::radio_lime_tx_stream(std::shared_ptr<LimeHandle> device_,
       else
         continue;
 
-      logger.debug("Set {} to {}", arg.first, arg.second);
+      printf("Set %s to %s\n", arg.first.c_str(), arg.second.c_str());
     }
   } 
 
@@ -284,7 +298,7 @@ void radio_lime_tx_stream::transmit(const baseband_gateway_buffer_reader& data, 
   while (txd_samples_total < nsamples) {
     unsigned txd_samples = 0;
     if (!transmit_block(txd_samples, data, txd_samples_total, meta)) {
-      logger.error("Error: failed transmitting packet. {}.", get_error_message().c_str());
+      printf("Error: failed transmitting packet. %s.\n", get_error_message().c_str());
       return;
     }
 
@@ -298,13 +312,43 @@ void radio_lime_tx_stream::transmit(const baseband_gateway_buffer_reader& data, 
 
 void radio_lime_tx_stream::stop()
 {
-  state_fsm.stop();
+  lime::StreamMeta md;
+  state_fsm.stop(md);
+
+  // Send end-of-burst if it is in the middle of a burst.
+  if (md.flushPartialPacket) {
+    std::unique_lock<std::mutex> transmit_lock(stream_transmit_mutex);
+
+    // Notify end of burst.
+    radio_notification_handler::event_description event_description = {};
+    event_description.stream_id                                     = stream_id;
+    event_description.channel_id                                    = 0;
+    event_description.source = radio_notification_handler::event_source::TRANSMIT;
+    event_description.type   = radio_notification_handler::event_type::END_OF_BURST;
+    notifier.on_radio_rt_event(event_description);
+
+    // Flatten buffers.
+    std::array<cf_t, 4>                          buffer;
+    static_vector<void*, RADIO_MAX_NOF_CHANNELS> buffs_flat_ptr(nof_channels);
+    for (unsigned channel = 0; channel != nof_channels; ++channel) {
+      buffs_flat_ptr[channel] = (void*)buffer.data();
+    }
+
+    // Make UHD buffers.
+    uhd::tx_streamer::buffs_type buffs_cpp(buffs_flat_ptr.data(), nof_channels);
+
+    // Safe transmission. Ignore return.
+    safe_execution([this, &buffs_cpp, &md]() {
+      // Actual transmission. Ignore number of transmitted samples.
+      stream->send(buffs_cpp, 0, md, TRANSMIT_TIMEOUT_S);
+    });
+  }
 }
 
 void radio_lime_tx_stream::wait_stop()
 {
-  // Nothing to do
-  return;
+  // TODO
+  // state_fsm.wait_stop();
 }
 
 unsigned radio_lime_tx_stream::get_buffer_size() const

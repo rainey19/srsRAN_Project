@@ -1,6 +1,6 @@
 /*
  *
- * Copyright 2021-2024 Software Radio Systems Limited
+ * Copyright 2021-2025 Software Radio Systems Limited
  *
  * This file is part of srsRAN.
  *
@@ -21,13 +21,14 @@
  */
 
 #include "radio_lime_rx_stream.h"
+#include "srsran/srslog/srslog.h"
 
 using namespace srsran;
 
 bool radio_lime_rx_stream::receive_block(unsigned&                       nof_rxd_samples,
                                          baseband_gateway_buffer_writer& data,
                                          unsigned                        offset,
-                                         lime::SDRDevice::StreamMeta&    md)
+                                         lime::StreamMeta&               md)
 {
   // Extract number of samples.
   unsigned num_samples = data.get_nof_samples() - offset;
@@ -47,26 +48,24 @@ bool radio_lime_rx_stream::receive_block(unsigned&                       nof_rxd
     buffs_flat_ptr[channel] = (void*)data[channel].subspan(offset, num_samples).data();
   }
 
-  lime::complex32f_t** buffer = (lime::complex32f_t**)buffs_flat_ptr.data();
+  // TODO: this only handles a single channel
+  lime::complex32f_t** buffs_cpp = (lime::complex32f_t**)buffs_flat_ptr.data();
 
-  // Protect concurrent call of reception and stop.
+  // Protect the lime Tx stream against concurrent access.
   std::unique_lock<std::mutex> lock(stream_mutex);
 
-  return safe_execution([this, buffer, num_samples, &md, &nof_rxd_samples]() {
-    nof_rxd_samples = stream->StreamRx(chipIndex, buffer, num_samples, &md);
+  return safe_execution([this, buffs_cpp, num_samples, &md, &nof_rxd_samples]() {
+    nof_rxd_samples = stream->StreamRx(chipIndex, buffs_cpp, num_samples, &md);
   });
 }
 
 radio_lime_rx_stream::radio_lime_rx_stream(std::shared_ptr<LimeHandle> device_,
                                          const stream_description&     description,
                                          radio_notification_handler&   notifier_) :
-  id(description.id),
-  srate_Hz(description.srate_Hz),
-  notifier(notifier_),
+  id(description.id), srate_Hz(description.srate_Hz), notifier(notifier_),
   stream(device_->dev()),
   device(device_),
   nof_channels(description.ports.size()),
-  logger(srslog::fetch_basic_logger("RF")),
   chipIndex(0)
 {
   srsran_assert(std::isnormal(srate_Hz) && (srate_Hz > 0.0), "Invalid sampling rate {}.", srate_Hz);
@@ -74,23 +73,23 @@ radio_lime_rx_stream::radio_lime_rx_stream(std::shared_ptr<LimeHandle> device_,
   // int availableRxChannels = LMS_GetNumChannels(stream, lime::Dir::Rx);
   // if (availableRxChannels < nof_channels)
   // {
-  //   logger.error("Device supports only {} Rx channels, required {}", availableRxChannels, nof_channels);
+  //   printf("Device supports only %d Rx channels, required %d\n", availableRxChannels, nof_channels);
   //   return;
   // }
 
   // Build stream arguments.
-  lime::SDRDevice::StreamConfig::DataFormat wire_format;
+  lime::DataFormat wire_format;
   switch (description.otw_format) {
     case radio_configuration::over_the_wire_format::DEFAULT:
     case radio_configuration::over_the_wire_format::SC16:
-      wire_format = lime::SDRDevice::StreamConfig::DataFormat::I16;
+      wire_format = lime::DataFormat::I16;
       break;
     case radio_configuration::over_the_wire_format::SC12:
-      wire_format = lime::SDRDevice::StreamConfig::DataFormat::I12;
+      wire_format = lime::DataFormat::I12;
       break;
     case radio_configuration::over_the_wire_format::SC8:
     default:
-      logger.error("Failed to create receive stream {}. invalid OTW format!", id);
+      printf("Failed to create receive stream %d. invalid OTW format!\n", id);
       return;
   }
 
@@ -109,7 +108,7 @@ radio_lime_rx_stream::radio_lime_rx_stream(std::shared_ptr<LimeHandle> device_,
     std::vector<std::pair<std::string, std::string>> args;
     if (!device->split_args(description.args, args))
     {
-      logger.error("Failed to create receive stream {}. Could not parse args!", id);
+      printf("Failed to create receive stream %d. Could not parse args!\n", id);
       return;
     }
 
@@ -167,7 +166,7 @@ radio_lime_rx_stream::radio_lime_rx_stream(std::shared_ptr<LimeHandle> device_,
         {
           if (strcasecmp(paths[j].c_str(), arg.second.c_str()) == 0)
           {
-            logger.debug("RX path: {} ({})", arg.second.c_str(), j);
+            printf("RX path: %s (%d)\n", arg.second.c_str(), j);
             for (unsigned int i=0; i<nof_channels; i++)
               device->GetDeviceConfig().channel[i].rx.path = j;
             match = true;
@@ -176,7 +175,7 @@ radio_lime_rx_stream::radio_lime_rx_stream(std::shared_ptr<LimeHandle> device_,
         }
 
         if (!match)
-          logger.error("RX path {} not valid!", arg.second.c_str());
+          printf("RX path %s not valid!\n", arg.second.c_str());
       }
       else if (arg.first == "usepoll")
       {
@@ -205,13 +204,13 @@ radio_lime_rx_stream::radio_lime_rx_stream(std::shared_ptr<LimeHandle> device_,
       else
         continue;
       
-      logger.debug("Set {} to {}", arg.first, arg.second);
+      printf("Set %s to %s\n", arg.first.c_str(), arg.second.c_str());
     }
   } 
 
   // Set max packet size.
   // TODO: This might need to be 256?
-  max_packet_size = (wire_format == lime::SDRDevice::StreamConfig::DataFormat::I12 ? 1360 : 1020)/nof_channels;
+  max_packet_size = (wire_format == lime::DataFormat::I12 ? 1360 : 1020)/nof_channels;
   // max_packet_size = 256;
 
   state = states::SUCCESSFUL_INIT;
@@ -223,11 +222,14 @@ bool radio_lime_rx_stream::start(const uint64_t time_spec)
     return true;
   }
 
+  // Protect the UHD Tx stream against concurrent access.
+  std::unique_lock<std::mutex> lock(stream_mutex);
+
   if (!safe_execution([this]() {
         stream->StreamSetup(device->GetStreamConfig(), chipIndex);
         stream->StreamStart(chipIndex);
       })) {
-    logger.error("Failed to start receive stream {}. {}.", id, get_error_message().c_str());
+    printf("Error: failed to start receive stream %d. %s.\n", id, get_error_message().c_str());
   }
 
   // Transition to streaming state.
@@ -236,22 +238,22 @@ bool radio_lime_rx_stream::start(const uint64_t time_spec)
   return true;
 }
 
-baseband_gateway_receiver::metadata radio_lime_rx_stream::receive(baseband_gateway_buffer_writer& data)
+baseband_gateway_receiver::metadata radio_lime_rx_stream::receive(baseband_gateway_buffer_writer& buffs)
 {
   baseband_gateway_receiver::metadata ret = {};
-  lime::SDRDevice::StreamMeta         md;
-  unsigned                            nsamples            = data[0].size();
+  lime::StreamMeta                    md;
+  unsigned                            nsamples            = buffs[0].size();
   unsigned                            rxd_samples_total   = 0;
 
   // Receive stream in multiple blocks.
   while (rxd_samples_total < nsamples) {
     unsigned rxd_samples = 0;
-    if (!receive_block(rxd_samples, data, rxd_samples_total, md)) {
-      logger.error("Failed receiving packet. {}.", get_error_message().c_str());
+    if (!receive_block(rxd_samples, buffs, rxd_samples_total, md)) {
+      printf("Error: failed receiving packet. %s.\n", get_error_message().c_str());
       return {};
     }
 
-    // Save timespec for first block.
+    // Save timespec for first block only if the last timestamp is unknown.
     if (rxd_samples_total == 0) {
       ret.ts = md.timestamp;
     }
@@ -276,7 +278,7 @@ bool radio_lime_rx_stream::stop()
   // Transition state to stop before locking to prevent real time priority thread owning the lock constantly.
   state = states::STOP;
 
-  // Protect concurrent call of stop and reception.
+  // Protect the UHD Tx stream against concurrent access.
   std::unique_lock<std::mutex> lock(stream_mutex);
 
   // Try to stop the stream.
